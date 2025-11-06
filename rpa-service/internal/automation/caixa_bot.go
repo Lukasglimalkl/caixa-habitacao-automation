@@ -251,6 +251,42 @@ func (bot *CaixaBot) extractAgendamento(ctx context.Context) (string, error) {
 	return agendamento, err
 }
 
+// clickParticipantes - clica no botão Participantes (função auxiliar privada)
+func (bot *CaixaBot) clickParticipantes(ctx context.Context) error {
+	logger.Info("👥 Clicando em Participantes...")
+
+	// Usa o iframe da página de detalhes (mesma onde pegou o agendamento)
+	iframeNode, err := bot.waitForIframe(ctx, "Detalhes - Participantes")
+	if err != nil {
+		return err
+	}
+
+	return chromedp.Run(ctx,
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			logger.Info("🔍 Procurando botão Participantes...")
+			return nil
+		}),
+
+		// Espera o div aparecer
+		chromedp.WaitVisible(`#participantePIDesabCheck`, chromedp.ByID, chromedp.FromNode(iframeNode)),
+
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			logger.Info("✓ Botão Participantes encontrado!")
+			return nil
+		}),
+
+		// Clica no div
+		chromedp.Click(`#participantePIDesabCheck`, chromedp.ByID, chromedp.FromNode(iframeNode)),
+
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			logger.Info("✓ Participantes clicado! Aguardando nova página...")
+			return nil
+		}),
+
+		chromedp.Sleep(4*time.Second), // Aguarda a nova página carregar
+	)
+}
+
 // LoginAndSearch - faz login e busca por CPF em uma única operação (FUNÇÃO PRINCIPAL)
 func (bot *CaixaBot) LoginAndSearch(req models.LoginAndSearchRequest) (*models.SearchResponse, error) {
 	logger.Info("========================================")
@@ -301,6 +337,17 @@ func (bot *CaixaBot) LoginAndSearch(req models.LoginAndSearchRequest) (*models.S
 		clientData.AgendamentoAssinatura = agendamento
 	}
 
+	// 5. Clica em Participantes (NOVO PASSO) 👈 ADICIONE AQUI
+	if err := bot.clickParticipantes(ctx); err != nil {
+		logger.Error(fmt.Sprintf("❌ Erro ao clicar em Participantes: %v", err))
+		return &models.SearchResponse{
+			Success: false,
+			Message: fmt.Sprintf("Erro ao clicar em Participantes: %v", err),
+		}, err
+	}
+
+	// TODO: Aqui você vai extrair dados da página de Participantes depois
+	
 	clientData.Nome = "Nome do Cliente (A EXTRAIR)"
 	clientData.Endereco = "Endereço (A EXTRAIR)"
 
