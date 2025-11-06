@@ -20,10 +20,13 @@ type SearchRequest struct {
 }
 
 // ClientData - dados extraídos do portal da Caixa
+// ClientData - dados extraídos do portal da Caixa
 type ClientData struct {
-	CPF      string `json:"cpf"`
-	Nome     string `json:"nome"`
-	Endereco string `json:"endereco"`
+	CPF                      string `json:"cpf"`
+	Nome                     string `json:"nome"`
+	Endereco                 string `json:"endereco"`
+	AgendamentoAssinatura    string `json:"agendamento_assinatura"`    // 👈 NOVO
+	NumeroContrato           string `json:"numero_contrato,omitempty"` // 👈 NOVO
 	// Adicione mais campos conforme você descobre no scraping
 }
 

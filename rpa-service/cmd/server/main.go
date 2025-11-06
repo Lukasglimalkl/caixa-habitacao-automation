@@ -27,10 +27,8 @@ func main() {
 	// Health check
 	router.HandleFunc("/health", handler.HealthCheck).Methods("GET")
 
- 	// Rotas de automação
-	router.HandleFunc("/api/login", handler.Login).Methods("POST")
-	router.HandleFunc("/api/search", handler.SearchByCPF).Methods("POST")
-	router.HandleFunc("/api/login-and-search", handler.LoginAndSearch).Methods("POST") // 👈 NOVA!
+	// Rota principal - Login + Busca
+	router.HandleFunc("/api/login-and-search", handler.LoginAndSearch).Methods("POST")
 
 	// Configura CORS (permite requisições do backend)
 	corsHandler := cors.New(cors.Options{
@@ -51,10 +49,8 @@ func main() {
 	go func() {
 		logger.Info(fmt.Sprintf("🌐 Servidor rodando em http://localhost:%s", port))
 		logger.Info("📋 Endpoints disponíveis:")
-		logger.Info("   GET  /health       - Health check")
-		logger.Info("   POST /api/login    - Login na Caixa")
-		logger.Info("   POST /api/search   - Buscar por CPF")
-		logger.Info("   POST /api/login-and-search - Login + Busca (TUDO)")
+		logger.Info("   GET  /health                - Health check")
+		logger.Info("   POST /api/login-and-search  - Login + Busca CPF (COMPLETO)")
 
 		if err := http.ListenAndServe(addr, httpHandler); err != nil {
 			logger.Error(fmt.Sprintf("Erro ao iniciar servidor: %v", err))
