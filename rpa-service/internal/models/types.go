@@ -20,14 +20,15 @@ type SearchRequest struct {
 }
 
 // ClientData - dados extraídos do portal da Caixa
-// ClientData - dados extraídos do portal da Caixa
 type ClientData struct {
-	CPF                      string `json:"cpf"`
-	Nome                     string `json:"nome"`
-	Endereco                 string `json:"endereco"`
-	AgendamentoAssinatura    string `json:"agendamento_assinatura"`    // 👈 NOVO
-	NumeroContrato           string `json:"numero_contrato,omitempty"` // 👈 NOVO
-	// Adicione mais campos conforme você descobre no scraping
+	CPF                   string `json:"cpf"`
+	Nome                  string `json:"nome"`
+	NumeroContrato        string `json:"numero_contrato"`
+	ContaDebitoCompleta   string `json:"conta_debito_completa"`
+	Agencia               string `json:"agencia"`
+	ContaCorrente         string `json:"conta_corrente"`
+	AgendamentoAssinatura string `json:"agendamento_assinatura"`
+	Endereco              string `json:"endereco,omitempty"` // Opcional por enquanto
 }
 
 // SearchResponse - resposta da busca
