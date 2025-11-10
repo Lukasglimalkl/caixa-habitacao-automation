@@ -73,7 +73,16 @@ func (bot *CaixaBot) LoginAndSearch(req models.LoginAndSearchRequest) (*models.S
 		}, err
 	}
 
-	// 6. Clica no CPF do participante
+	// Inicializa clientData aqui para usar nas próximas funções
+	clientData := &models.ClientData{}
+
+	// 6. 🆕 EXTRAI DADOS DO COOBRIGADO DA TABELA (antes de clicar)
+	if err := bot.extractCoobrigadoFromTable(ctx, clientData); err != nil {
+		logger.Error(fmt.Sprintf("⚠️ Erro ao extrair coobrigado: %v", err))
+		// Não retorna erro, continua o fluxo
+	}
+
+	// 7. Clica no CPF do PROPONENTE (primeiro participante)
 	if err := bot.clickParticipanteCPF(ctx); err != nil {
 		logger.Error(fmt.Sprintf("❌ Erro ao clicar no CPF: %v", err))
 		return &models.SearchResponse{
@@ -82,8 +91,8 @@ func (bot *CaixaBot) LoginAndSearch(req models.LoginAndSearchRequest) (*models.S
 		}, err
 	}
 
-	// 7. Extrai todos os dados do participante
-	clientData, err := bot.extractDadosParticipante(ctx)
+	// 8. Extrai todos os dados do PROPONENTE
+	proponenteData, err := bot.extractDadosParticipante(ctx)
 	if err != nil {
 		logger.Error(fmt.Sprintf("❌ Erro ao extrair dados: %v", err))
 		return &models.SearchResponse{
@@ -92,13 +101,21 @@ func (bot *CaixaBot) LoginAndSearch(req models.LoginAndSearchRequest) (*models.S
 		}, err
 	}
 
-	// 8. Adiciona o agendamento
+	// 9. Mescla os dados do proponente com os dados já capturados do coobrigado
+	clientData.CPF = proponenteData.CPF
+	clientData.Nome = proponenteData.Nome
+	clientData.NumeroContrato = proponenteData.NumeroContrato
+	clientData.ContaDebitoCompleta = proponenteData.ContaDebitoCompleta
+	clientData.Agencia = proponenteData.Agencia
+	clientData.ContaCorrente = proponenteData.ContaCorrente
 	clientData.AgendamentoAssinatura = agendamento
 
 	logger.Info("========================================")
 	logger.Info("✅ PROCESSO CONCLUÍDO!")
-	logger.Info(fmt.Sprintf("📝 Nome: %s", clientData.Nome))
-	logger.Info(fmt.Sprintf("📋 CPF: %s", clientData.CPF))
+	logger.Info(fmt.Sprintf("📝 Nome Proponente: %s", clientData.Nome))
+	logger.Info(fmt.Sprintf("📋 CPF Proponente: %s", clientData.CPF))
+	logger.Info(fmt.Sprintf("👥 Nome Coobrigado: %s", clientData.CoobrigadoNome))
+	logger.Info(fmt.Sprintf("👥 CPF Coobrigado: %s", clientData.CoobrigadoCPF))
 	logger.Info(fmt.Sprintf("📄 Contrato: %s", clientData.NumeroContrato))
 	logger.Info(fmt.Sprintf("🏦 Conta completa: %s", clientData.ContaDebitoCompleta))
 	logger.Info(fmt.Sprintf("🏢 Agência: %s", clientData.Agencia))

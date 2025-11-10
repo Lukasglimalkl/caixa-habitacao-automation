@@ -21,6 +21,7 @@ type SearchRequest struct {
 
 // ClientData - dados extraídos do portal da Caixa
 type ClientData struct {
+	// Dados do Proponente (clicando no link)
 	CPF                   string `json:"cpf"`
 	Nome                  string `json:"nome"`
 	NumeroContrato        string `json:"numero_contrato"`
@@ -28,7 +29,11 @@ type ClientData struct {
 	Agencia               string `json:"agencia"`
 	ContaCorrente         string `json:"conta_corrente"`
 	AgendamentoAssinatura string `json:"agendamento_assinatura"`
-	Endereco              string `json:"endereco,omitempty"` // Opcional por enquanto
+	Endereco              string `json:"endereco,omitempty"`
+	
+	// Dados do Coobrigado (da tabela)
+	CoobrigadoCPF  string `json:"coobrigado_cpf,omitempty"`
+	CoobrigadoNome string `json:"coobrigado_nome,omitempty"`
 }
 
 // SearchResponse - resposta da busca
