@@ -29,11 +29,23 @@ type ClientData struct {
 	Agencia               string `json:"agencia"`
 	ContaCorrente         string `json:"conta_corrente"`
 	AgendamentoAssinatura string `json:"agendamento_assinatura"`
-	Endereco              string `json:"endereco,omitempty"`
 	
 	// Dados do Coobrigado (da tabela)
 	CoobrigadoCPF  string `json:"coobrigado_cpf,omitempty"`
 	CoobrigadoNome string `json:"coobrigado_nome,omitempty"`
+	
+	// Dados de Contato
+	TelefoneCelular string `json:"telefone_celular,omitempty"`
+	
+	// Dados de Endereço
+	CEP              string `json:"cep,omitempty"`
+	TipoLogradouro   string `json:"tipo_logradouro,omitempty"`
+	Logradouro       string `json:"logradouro,omitempty"`
+	Numero           string `json:"numero,omitempty"`
+	Bairro           string `json:"bairro,omitempty"`
+	Municipio        string `json:"municipio,omitempty"`
+	UF               string `json:"uf,omitempty"`
+	Complemento      string `json:"complemento,omitempty"`
 }
 
 // SearchResponse - resposta da busca

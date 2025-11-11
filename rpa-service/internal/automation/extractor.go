@@ -41,6 +41,23 @@ func (bot *CaixaBot) extractDadosParticipante(ctx context.Context) (*models.Clie
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			return bot.extractNome(ctx, iframeNode, &clientData)
 		}),
+		
+		// 🆕 Extrai Telefone Celular
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			return bot.extractTelefoneCelular(ctx, iframeNode, &clientData)
+		}),
+
+		// Scroll até tabela de endereço
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			return bot.scrollToEnderecoTable(ctx)
+		}),
+
+		chromedp.Sleep(2*time.Second),
+		
+		// 🆕 Extrai Endereço completo
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			return bot.extractEndereco(ctx, iframeNode, &clientData)
+		}),
 
 		// Scroll até tabela de dados da conta
 		chromedp.ActionFunc(func(ctx context.Context) error {
@@ -189,4 +206,179 @@ func (bot *CaixaBot) extractContaDebito(ctx context.Context, iframeNode *cdp.Nod
 	}
 	
 	return nil
+}
+
+// extractTelefoneCelular - extrai o telefone celular do participante
+func (bot *CaixaBot) extractTelefoneCelular(ctx context.Context, iframeNode *cdp.Node, clientData *models.ClientData) error {
+	logger.Info("📱 Extraindo Telefone Celular...")
+	
+	// XPath para encontrar o telefone celular
+	xpath := `//tr[.//label[contains(., 'Telefone Celular:')]]/td[@class='alinha_esquerda'][1]`
+	
+	var telefoneCelular string
+	err := chromedp.Text(xpath, &telefoneCelular, chromedp.BySearch, chromedp.FromNode(iframeNode)).Do(ctx)
+	if err != nil {
+		logger.Error(fmt.Sprintf("Erro ao extrair telefone celular: %v", err))
+		return err
+	}
+	
+	clientData.TelefoneCelular = strings.TrimSpace(telefoneCelular)
+	logger.Info(fmt.Sprintf("✓ Telefone Celular: %s", clientData.TelefoneCelular))
+	
+	return nil
+}
+
+// scrollToEnderecoTable - faz scroll até a tabela de Endereço
+func (bot *CaixaBot) scrollToEnderecoTable(ctx context.Context) error {
+	logger.Info("📜 Fazendo scroll até tabela 'Endereço'...")
+	
+	jsCode := `
+		(function() {
+			// Procura pelo th que contém "Endereço"
+			const xpath = "//th[contains(., 'Endereço') and not(contains(., 'Correspondência'))]";
+			const result = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+			const element = result.singleNodeValue;
+			
+			if (element) {
+				console.log("Tabela Endereço encontrada, fazendo scroll...");
+				element.scrollIntoView({behavior: 'smooth', block: 'center'});
+				return true;
+			} else {
+				console.log("Tabela Endereço não encontrada!");
+				return false;
+			}
+		})();
+	`
+	
+	var scrollSuccess bool
+	err := chromedp.Evaluate(jsCode, &scrollSuccess).Do(ctx)
+	
+	if err != nil {
+		logger.Error(fmt.Sprintf("Erro ao executar scroll: %v", err))
+	} else if scrollSuccess {
+		logger.Info("✓ Scroll até tabela Endereço executado!")
+	} else {
+		logger.Info("⚠️ Tabela 'Endereço' não encontrada para scroll")
+	}
+	
+	return nil
+}
+
+// extractEndereco - extrai todos os dados de endereço (PRIMEIRO endereço, não o de correspondência)
+func (bot *CaixaBot) extractEndereco(ctx context.Context, iframeNode *cdp.Node, clientData *models.ClientData) error {
+	logger.Info("🏠 Extraindo dados de Endereço...")
+	
+	// XPath base: pega a primeira tabela com "Endereço" no header (não a de correspondência)
+	baseXPath := `//table[.//th[contains(text(), 'Endereço') and not(contains(text(), 'Correspondência'))]]`
+	
+	err := chromedp.Run(ctx,
+		// CEP
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			xpath := baseXPath + `//tr[.//label[contains(., 'CEP:')]]/td[@class='alinha_esquerda'][1]`
+			var cep string
+			err := chromedp.Text(xpath, &cep, chromedp.BySearch, chromedp.FromNode(iframeNode)).Do(ctx)
+			if err != nil {
+				logger.Error(fmt.Sprintf("Erro ao extrair CEP: %v", err))
+				return err
+			}
+			clientData.CEP = strings.TrimSpace(cep)
+			logger.Info(fmt.Sprintf("✓ CEP: %s", clientData.CEP))
+			return nil
+		}),
+		
+		// Tipo de Logradouro
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			xpath := baseXPath + `//tr[.//label[contains(., 'Tipo de Logradouro:')]]/td[@class='alinha_esquerda'][last()]`
+			var tipoLogradouro string
+			err := chromedp.Text(xpath, &tipoLogradouro, chromedp.BySearch, chromedp.FromNode(iframeNode)).Do(ctx)
+			if err != nil {
+				logger.Error(fmt.Sprintf("Erro ao extrair Tipo de Logradouro: %v", err))
+				return err
+			}
+			clientData.TipoLogradouro = strings.TrimSpace(tipoLogradouro)
+			logger.Info(fmt.Sprintf("✓ Tipo de Logradouro: %s", clientData.TipoLogradouro))
+			return nil
+		}),
+		
+		// Logradouro
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			xpath := baseXPath + `//tr[.//label[contains(., 'Logradouro:')]]/td[@class='alinha_esquerda'][1]`
+			var logradouro string
+			err := chromedp.Text(xpath, &logradouro, chromedp.BySearch, chromedp.FromNode(iframeNode)).Do(ctx)
+			if err != nil {
+				logger.Error(fmt.Sprintf("Erro ao extrair Logradouro: %v", err))
+				return err
+			}
+			clientData.Logradouro = strings.TrimSpace(logradouro)
+			logger.Info(fmt.Sprintf("✓ Logradouro: %s", clientData.Logradouro))
+			return nil
+		}),
+		
+		// Número
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			xpath := baseXPath + `//tr[.//label[contains(., 'Número:')]]/td[@class='alinha_esquerda'][last()]`
+			var numero string
+			err := chromedp.Text(xpath, &numero, chromedp.BySearch, chromedp.FromNode(iframeNode)).Do(ctx)
+			if err != nil {
+				logger.Error(fmt.Sprintf("Erro ao extrair Número: %v", err))
+				return err
+			}
+			clientData.Numero = strings.TrimSpace(numero)
+			logger.Info(fmt.Sprintf("✓ Número: %s", clientData.Numero))
+			return nil
+		}),
+		
+		// Bairro
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			xpath := baseXPath + `//tr[.//label[contains(., 'Bairro:')]]/td[@class='alinha_esquerda'][last()]`
+			var bairro string
+			err := chromedp.Text(xpath, &bairro, chromedp.BySearch, chromedp.FromNode(iframeNode)).Do(ctx)
+			if err != nil {
+				logger.Error(fmt.Sprintf("Erro ao extrair Bairro: %v", err))
+				return err
+			}
+			clientData.Bairro = strings.TrimSpace(bairro)
+			logger.Info(fmt.Sprintf("✓ Bairro: %s", clientData.Bairro))
+			return nil
+		}),
+		
+		// Município - UF
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			xpath := baseXPath + `//tr[.//label[contains(., 'Município - UF:')]]/td[@class='alinha_esquerda']`
+			var municipioUF string
+			err := chromedp.Text(xpath, &municipioUF, chromedp.BySearch, chromedp.FromNode(iframeNode)).Do(ctx)
+			if err != nil {
+				logger.Error(fmt.Sprintf("Erro ao extrair Município-UF: %v", err))
+				return err
+			}
+			
+			// Separa Município e UF (formato: "SAO PAULO - SP")
+			municipioUF = strings.TrimSpace(municipioUF)
+			partes := strings.Split(municipioUF, "-")
+			if len(partes) >= 2 {
+				clientData.Municipio = strings.TrimSpace(partes[0])
+				clientData.UF = strings.TrimSpace(partes[1])
+			} else {
+				clientData.Municipio = municipioUF
+			}
+			
+			logger.Info(fmt.Sprintf("✓ Município: %s", clientData.Municipio))
+			logger.Info(fmt.Sprintf("✓ UF: %s", clientData.UF))
+			return nil
+		}),
+		
+		// Complemento (pode estar vazio)
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			xpath := baseXPath + `//tr[.//label[contains(., 'Complemento:')]]/td[@class='alinha_esquerda'][1]`
+			var complemento string
+			chromedp.Text(xpath, &complemento, chromedp.BySearch, chromedp.FromNode(iframeNode)).Do(ctx)
+			clientData.Complemento = strings.TrimSpace(complemento)
+			if clientData.Complemento != "" {
+				logger.Info(fmt.Sprintf("✓ Complemento: %s", clientData.Complemento))
+			}
+			return nil
+		}),
+	)
+	
+	return err
 }

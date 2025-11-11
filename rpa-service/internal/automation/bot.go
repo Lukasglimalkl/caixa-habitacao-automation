@@ -73,16 +73,15 @@ func (bot *CaixaBot) LoginAndSearch(req models.LoginAndSearchRequest) (*models.S
 		}, err
 	}
 
-	// Inicializa clientData aqui para usar nas próximas funções
+	// Inicializa clientData aqui
 	clientData := &models.ClientData{}
 
-	// 6. 🆕 EXTRAI DADOS DO COOBRIGADO DA TABELA (antes de clicar)
+	// 6. Extrai dados do Coobrigado da tabela
 	if err := bot.extractCoobrigadoFromTable(ctx, clientData); err != nil {
 		logger.Error(fmt.Sprintf("⚠️ Erro ao extrair coobrigado: %v", err))
-		// Não retorna erro, continua o fluxo
 	}
 
-	// 7. Clica no CPF do PROPONENTE (primeiro participante)
+	// 7. Clica no CPF do PROPONENTE
 	if err := bot.clickParticipanteCPF(ctx); err != nil {
 		logger.Error(fmt.Sprintf("❌ Erro ao clicar no CPF: %v", err))
 		return &models.SearchResponse{
@@ -91,7 +90,7 @@ func (bot *CaixaBot) LoginAndSearch(req models.LoginAndSearchRequest) (*models.S
 		}, err
 	}
 
-	// 8. Extrai todos os dados do PROPONENTE
+	// 8. Extrai todos os dados do PROPONENTE (incluindo telefone e endereço)
 	proponenteData, err := bot.extractDadosParticipante(ctx)
 	if err != nil {
 		logger.Error(fmt.Sprintf("❌ Erro ao extrair dados: %v", err))
@@ -101,7 +100,7 @@ func (bot *CaixaBot) LoginAndSearch(req models.LoginAndSearchRequest) (*models.S
 		}, err
 	}
 
-	// 9. Mescla os dados do proponente com os dados já capturados do coobrigado
+	// 9. Mescla os dados
 	clientData.CPF = proponenteData.CPF
 	clientData.Nome = proponenteData.Nome
 	clientData.NumeroContrato = proponenteData.NumeroContrato
@@ -109,17 +108,43 @@ func (bot *CaixaBot) LoginAndSearch(req models.LoginAndSearchRequest) (*models.S
 	clientData.Agencia = proponenteData.Agencia
 	clientData.ContaCorrente = proponenteData.ContaCorrente
 	clientData.AgendamentoAssinatura = agendamento
+	clientData.TelefoneCelular = proponenteData.TelefoneCelular
+	clientData.CEP = proponenteData.CEP
+	clientData.TipoLogradouro = proponenteData.TipoLogradouro
+	clientData.Logradouro = proponenteData.Logradouro
+	clientData.Numero = proponenteData.Numero
+	clientData.Bairro = proponenteData.Bairro
+	clientData.Municipio = proponenteData.Municipio
+	clientData.UF = proponenteData.UF
+	clientData.Complemento = proponenteData.Complemento
+
+	// 10. 🆕 Clica no botão "Ir para"
+	if err := bot.clickIrPara(ctx); err != nil {
+		logger.Error(fmt.Sprintf("❌ Erro ao clicar em 'Ir para': %v", err))
+		return &models.SearchResponse{
+			Success: false,
+			Message: fmt.Sprintf("Erro ao clicar em 'Ir para': %v", err),
+		}, err
+	}
+
+	// 11. 🆕 Clica no menu "Imóvel"
+	if err := bot.clickMenuImovel(ctx); err != nil {
+		logger.Error(fmt.Sprintf("❌ Erro ao clicar no menu 'Imóvel': %v", err))
+		return &models.SearchResponse{
+			Success: false,
+			Message: fmt.Sprintf("Erro ao clicar no menu 'Imóvel': %v", err),
+		}, err
+	}
 
 	logger.Info("========================================")
 	logger.Info("✅ PROCESSO CONCLUÍDO!")
-	logger.Info(fmt.Sprintf("📝 Nome Proponente: %s", clientData.Nome))
-	logger.Info(fmt.Sprintf("📋 CPF Proponente: %s", clientData.CPF))
-	logger.Info(fmt.Sprintf("👥 Nome Coobrigado: %s", clientData.CoobrigadoNome))
-	logger.Info(fmt.Sprintf("👥 CPF Coobrigado: %s", clientData.CoobrigadoCPF))
+	logger.Info(fmt.Sprintf("📝 Nome: %s", clientData.Nome))
+	logger.Info(fmt.Sprintf("📋 CPF: %s", clientData.CPF))
+	logger.Info(fmt.Sprintf("👥 Coobrigado: %s (%s)", clientData.CoobrigadoNome, clientData.CoobrigadoCPF))
+	logger.Info(fmt.Sprintf("📱 Telefone: %s", clientData.TelefoneCelular))
+	logger.Info(fmt.Sprintf("🏠 Endereço: %s %s, %s - %s/%s", clientData.TipoLogradouro, clientData.Logradouro, clientData.Numero, clientData.Municipio, clientData.UF))
 	logger.Info(fmt.Sprintf("📄 Contrato: %s", clientData.NumeroContrato))
-	logger.Info(fmt.Sprintf("🏦 Conta completa: %s", clientData.ContaDebitoCompleta))
-	logger.Info(fmt.Sprintf("🏢 Agência: %s", clientData.Agencia))
-	logger.Info(fmt.Sprintf("💳 Conta Corrente: %s", clientData.ContaCorrente))
+	logger.Info(fmt.Sprintf("💳 Conta: %s (Ag: %s)", clientData.ContaCorrente, clientData.Agencia))
 	logger.Info(fmt.Sprintf("📅 Agendamento: %s", clientData.AgendamentoAssinatura))
 	logger.Info("========================================")
 
