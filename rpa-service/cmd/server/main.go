@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -9,6 +10,8 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/lukasglimalkl/caixa-habitacao-automation/rpa-service/internal/handlers"
+	"github.com/lukasglimalkl/caixa-habitacao-automation/rpa-service/internal/models"
+	"github.com/lukasglimalkl/caixa-habitacao-automation/rpa-service/internal/queue"
 	"github.com/lukasglimalkl/caixa-habitacao-automation/rpa-service/pkg/logger"
 	"github.com/rs/cors"
 )
@@ -74,4 +77,40 @@ func getEnv(key, defaultValue string) string {
 		return defaultValue
 	}
 	return value
+}
+
+func HandleAddJobToQueue(w http.ResponseWriter, r *http.Request) {
+	var req models.LoginAndSearchRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	q := queue.NewRedisQueue("localhost:6379")
+	
+	jobID, err := q.AddJob(req.Username, req.Password, req.CPF)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]string{
+		"job_id": jobID,
+		"status": "pending",
+		"message": "Job adicionado na fila",
+	})
+}
+
+func HandleGetJobStatus(w http.ResponseWriter, r *http.Request) {
+	jobID := r.URL.Query().Get("job_id")
+	
+	q := queue.NewRedisQueue("localhost:6379")
+	
+	job, err := q.GetJobStatus(jobID)
+	if err != nil {
+		http.Error(w, "Job não encontrado", http.StatusNotFound)
+		return
+	}
+
+	json.NewEncoder(w).Encode(job)
 }

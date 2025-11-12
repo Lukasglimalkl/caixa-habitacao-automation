@@ -81,15 +81,14 @@ func (bot *CaixaBot) LoginAndSearch(req models.LoginAndSearchRequest) (*models.S
 		logger.Error(fmt.Sprintf("⚠️ Erro ao extrair coobrigado: %v", err))
 	}
 
-	// 7. Clica no CPF do PROPONENTE
-	if err := bot.clickParticipanteCPF(ctx); err != nil {
+	// 7. Clica no CPF do PROPONENTE (COM RETRY)
+	if err := bot.clickParticipanteCPFWithRetry(ctx); err != nil {
 		logger.Error(fmt.Sprintf("❌ Erro ao clicar no CPF: %v", err))
 		return &models.SearchResponse{
 			Success: false,
 			Message: fmt.Sprintf("Erro ao clicar no CPF: %v", err),
 		}, err
 	}
-
 	// 8. Extrai todos os dados do PROPONENTE (incluindo telefone e endereço)
 	proponenteData, err := bot.extractDadosParticipante(ctx)
 	if err != nil {
@@ -126,6 +125,7 @@ func (bot *CaixaBot) LoginAndSearch(req models.LoginAndSearchRequest) (*models.S
 			Message: fmt.Sprintf("Erro ao clicar em 'Ir para': %v", err),
 		}, err
 	}
+
 
 	// 11. 🆕 Clica no menu "Imóvel"
 	if err := bot.clickMenuImovel(ctx); err != nil {
