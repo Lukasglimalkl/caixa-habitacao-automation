@@ -9,7 +9,7 @@ import (
 	"github.com/lukasglimalkl/caixa-habitacao-automation/rpa-service/pkg/logger"
 )
 
-// Handler - estrutura que vai conter os handlers HTTP
+// Handler - gerencia as requisições HTTP
 type Handler struct {
 	bot *automation.CaixaBot
 }
@@ -17,62 +17,48 @@ type Handler struct {
 // NewHandler - cria um novo handler
 func NewHandler() *Handler {
 	return &Handler{
-		bot: automation.NewCaixaBot(),
+		bot: automation.NewCaixaBot(true), // headless = true
 	}
 }
 
-// HealthCheck - endpoint de health check
-func (h *Handler) HealthCheck(w http.ResponseWriter, r *http.Request) {
-	logger.Info("Health check requisitado")
-
-	response := models.HealthResponse{
-		Status:  "UP",
-		Service: "RPA Service - Caixa Automation",
-		Version: "1.0.0",
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
-}
-
-// LoginAndSearch - endpoint que faz login e busca em uma única operação
+// LoginAndSearch - endpoint para login e busca
 func (h *Handler) LoginAndSearch(w http.ResponseWriter, r *http.Request) {
-	logger.Info("Requisição de login + busca recebida")
-
-	if r.Method != http.MethodPost {
-		http.Error(w, "Método não permitido", http.StatusMethodNotAllowed)
-		return
-	}
-
 	var req models.LoginAndSearchRequest
+	
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logger.Error("Erro ao decodificar request: " + err.Error())
-		http.Error(w, "JSON inválido", http.StatusBadRequest)
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-
-	// Valida campos
-	if req.Username == "" || req.Password == "" || req.CPF == "" {
-		http.Error(w, "Username, password e CPF são obrigatórios", http.StatusBadRequest)
-		return
-	}
-
-	// Chama o bot
-	response, err := h.bot.LoginAndSearch(req)
+	
+	logger.Info("📥 Nova requisição recebida")
+	logger.Info("👤 Usuário: " + req.Username)
+	logger.Info("🔍 CPF: " + req.CPF)
+	
+	// Executa automação
+	response, err := h.bot.LoginAndSearch(req.Username, req.Password, req.CPF)
+	
+	w.Header().Set("Content-Type", "application/json")
+	
 	if err != nil {
-		logger.Error("Erro no processo: " + err.Error())
-		w.Header().Set("Content-Type", "application/json")
+		logger.Error("❌ Erro na automação: " + err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(response)
 		return
 	}
+	
+	logger.Info("✅ Requisição processada com sucesso!")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
+}
 
-	w.Header().Set("Content-Type", "application/json")
-	if response.Success {
-		w.WriteHeader(http.StatusOK)
-	} else {
-		w.WriteHeader(http.StatusNotFound)
+// Health - endpoint de health check
+func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
+	response := models.HealthResponse{
+		Status:  "healthy",
+		Service: "RPA Service - Caixa Automation",
+		Version: "2.0.0",
 	}
+	
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
