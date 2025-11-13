@@ -11,13 +11,13 @@ import (
 
 // Handler - gerencia as requisições HTTP
 type Handler struct {
-	bot *automation.CaixaBot
+	headless bool
 }
 
 // NewHandler - cria um novo handler
-func NewHandler() *Handler {
+func NewHandler(headless bool) *Handler {
 	return &Handler{
-		bot: automation.NewCaixaBot(true), // headless = true
+		headless: headless,
 	}
 }
 
@@ -34,8 +34,11 @@ func (h *Handler) LoginAndSearch(w http.ResponseWriter, r *http.Request) {
 	logger.Info("👤 Usuário: " + req.Username)
 	logger.Info("🔍 CPF: " + req.CPF)
 	
+	// Cria bot para cada requisição (com headless configurável)
+	bot := automation.NewCaixaBot(h.headless)
+	
 	// Executa automação
-	response, err := h.bot.LoginAndSearch(req.Username, req.Password, req.CPF)
+	response, err := bot.LoginAndSearch(req.Username, req.Password, req.CPF)
 	
 	w.Header().Set("Content-Type", "application/json")
 	

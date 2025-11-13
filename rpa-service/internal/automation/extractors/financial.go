@@ -12,11 +12,6 @@ import (
 	"github.com/lukasglimalkl/caixa-habitacao-automation/rpa-service/pkg/logger"
 )
 
-// FinancialExtractor - interface para extração de dados financeiros
-type FinancialExtractor interface {
-	ExtractFinancialData(ctx context.Context, iframeNode *cdp.Node, clientData *models.ClientData) error
-}
-
 // CaixaFinancialExtractor - implementação para extração de valores
 type CaixaFinancialExtractor struct{}
 

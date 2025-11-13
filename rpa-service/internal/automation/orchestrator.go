@@ -45,7 +45,12 @@ func NewOrchestrator(bot *CaixaBot) *Orchestrator {
 func (o *Orchestrator) Execute(ctx context.Context, username, password, cpf string) (*models.ClientData, error) {
 	logger.Info("🚀 Iniciando processo de automação completo...")
 	logger.Info("========================================")
+	logger.Info("📋 Configurações:")
+	logger.Info(fmt.Sprintf("   - Timeout Total: %v", o.bot.timeouts.BrowserContext))
+	logger.Info(fmt.Sprintf("   - Headless: %v", o.bot.browserConfig.Headless))
+	logger.Info("========================================")
 	
+	// ... resto do código
 	// Cria context do navegador
 	browserCtx, cancel := o.bot.createBrowserContext(ctx)
 	defer cancel()
@@ -55,10 +60,12 @@ func (o *Orchestrator) Execute(ctx context.Context, username, password, cpf stri
 	defer timeoutCancel()
 	
 	// Inicia navegador
+	logger.Info("🌐 Inicializando navegador Chrome...")
 	if err := chromedp.Run(timeoutCtx); err != nil {
+		logger.Error(fmt.Sprintf("❌ Erro ao iniciar navegador: %v", err))
 		return nil, fmt.Errorf("erro ao iniciar navegador: %w", err)
 	}
-	
+	logger.Info("✅ Navegador inicializado com sucesso!")
 	// 1. Login
 	if err := o.executeLogin(timeoutCtx, username, password); err != nil {
 		return nil, fmt.Errorf("erro no login: %w", err)

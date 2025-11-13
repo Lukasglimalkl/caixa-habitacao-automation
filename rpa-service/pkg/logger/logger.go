@@ -6,23 +6,28 @@ import (
 )
 
 var (
-	InfoLogger  *log.Logger
-	ErrorLogger *log.Logger
+	infoLogger  *log.Logger
+	errorLogger *log.Logger
 )
 
-// Inicializa os loggers
+// Init - inicializa o logger
 func Init() {
-	InfoLogger = log.New(os.Stdout, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
-	ErrorLogger = log.New(os.Stderr, "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile)
+	infoLogger = log.New(os.Stdout, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
+	errorLogger = log.New(os.Stderr, "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile)
 }
 
-// Info loga mensagens de informação
+// Info - loga mensagem de informação
 func Info(message string) {
-	InfoLogger.Println(message)
+	if infoLogger == nil {
+		Init() // Auto-inicializa se não foi inicializado
+	}
+	infoLogger.Println(message)
 }
 
-// Error loga mensagens de erro
+// Error - loga mensagem de erro
 func Error(message string) {
-	ErrorLogger.Println(message)
+	if errorLogger == nil {
+		Init() // Auto-inicializa se não foi inicializado
+	}
+	errorLogger.Println(message)
 }
-

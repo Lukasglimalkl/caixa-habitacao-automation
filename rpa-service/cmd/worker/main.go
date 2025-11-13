@@ -15,6 +15,10 @@ import (
 )
 
 func main() {
+
+	// Inicializa o logger
+	logger.Init()
+
 	workerID := os.Getenv("WORKER_ID")
 	if workerID == "" {
 		workerID = "worker-1"

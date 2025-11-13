@@ -3,8 +3,10 @@ package navigation
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/chromedp"
 	"github.com/lukasglimalkl/caixa-habitacao-automation/rpa-service/internal/automation/config"
 	"github.com/lukasglimalkl/caixa-habitacao-automation/rpa-service/pkg/logger"
@@ -17,7 +19,7 @@ type SearchNavigator interface {
 	ExtractAgendamentoAssinatura(ctx context.Context, iframeWaiter IframeWaiter) (string, error)
 }
 
-// CaixaSearchNavigator - implementação para busca no portal da Caixa
+// CaixaSearchNavigator - implementação para busca na Caixa
 type CaixaSearchNavigator struct {
 	timeouts   config.Timeouts
 	maxRetries config.MaxRetries
@@ -35,50 +37,93 @@ func NewCaixaSearchNavigator(timeouts config.Timeouts, maxRetries config.MaxRetr
 func (nav *CaixaSearchNavigator) SearchByCPF(ctx context.Context, cpf string) error {
 	logger.Info(fmt.Sprintf("🔍 Buscando CPF: %s", cpf))
 	
-	return chromedp.Run(ctx,
-		// Aguarda campo de busca aparecer
-		chromedp.WaitVisible(`#cpfCnpj`, chromedp.ByID),
+	// CRÍTICO: Aguarda iframe carregar ANTES de qualquer coisa
+	logger.Info("⏳ Aguardando iframe carregar...")
+	time.Sleep(5 * time.Second)
+	
+	// Busca o iframe (como slice)
+	var iframeNodes []*cdp.Node
+	err := chromedp.Run(ctx,
+		chromedp.Sleep(2*time.Second),
+		chromedp.Nodes(`iframe[id^="frameConteudo"]`, &iframeNodes, chromedp.BySearch, chromedp.AtLeast(0)),
+	)
+	
+	if err != nil {
+		logger.Error(fmt.Sprintf("❌ Erro ao buscar iframe: %v", err))
+		return fmt.Errorf("iframe não encontrado: %w", err)
+	}
+	
+	if len(iframeNodes) == 0 {
+		logger.Error("❌ Nenhum iframe encontrado")
+		return fmt.Errorf("iframe não encontrado")
+	}
+	
+	iframeNode := iframeNodes[0]
+	logger.Info("✓ Iframe encontrado!")
+	
+	// Agora sim, interage DENTRO do iframe
+	err = chromedp.Run(ctx,
+		// Aguarda campo CPF estar visível DENTRO DO IFRAME
+		chromedp.WaitVisible(`#cpfCnpj`, chromedp.ByID, chromedp.FromNode(iframeNode)),
 		
-		// Limpa campo e preenche CPF
-		chromedp.Clear(`#cpfCnpj`, chromedp.ByID),
-		chromedp.SendKeys(`#cpfCnpj`, cpf, chromedp.ByID),
+		// Limpa o campo primeiro
+		chromedp.Clear(`#cpfCnpj`, chromedp.ByID, chromedp.FromNode(iframeNode)),
+		
+		// Preenche CPF
+		chromedp.SendKeys(`#cpfCnpj`, cpf, chromedp.ByID, chromedp.FromNode(iframeNode)),
+		
+		chromedp.Sleep(1*time.Second),
 		
 		// Clica no botão de pesquisar
-		chromedp.Click(`#btConsultarProposta`, chromedp.ByID),
+		chromedp.Click(`#btConsultarProposta`, chromedp.ByID, chromedp.FromNode(iframeNode)),
 		
-		// Aguarda resultado
-		chromedp.Sleep(nav.timeouts.AfterClick),
+		// Aguarda resultados aparecerem
+		chromedp.Sleep(5*time.Second),
 	)
+	
+	if err != nil {
+		return err
+	}
+	
+	logger.Info("✓ Busca iniciada, aguardando resultados...")
+	return nil
 }
 
 // ClickFirstResult - clica no primeiro resultado da busca
 func (nav *CaixaSearchNavigator) ClickFirstResult(ctx context.Context) error {
 	logger.Info("🎯 Clicando no primeiro resultado...")
 	
-	return chromedp.Run(ctx,
-		// Aguarda tabela de resultados
-		chromedp.WaitVisible(`table.tb_lista`, chromedp.BySearch),
+	// Busca o iframe novamente
+	var iframeNodes []*cdp.Node
+	err := chromedp.Run(ctx,
+		chromedp.Nodes(`iframe[id^="frameConteudo"]`, &iframeNodes, chromedp.BySearch, chromedp.AtLeast(0)),
+	)
+	
+	if err != nil || len(iframeNodes) == 0 {
+		return fmt.Errorf("iframe não encontrado para clicar no resultado")
+	}
+	
+	iframeNode := iframeNodes[0]
+	
+	// Aguarda tabela de resultados aparecer DENTRO DO IFRAME
+	err = chromedp.Run(ctx,
+		chromedp.WaitVisible(`table.tb_lista`, chromedp.BySearch, chromedp.FromNode(iframeNode)),
+		
 		chromedp.Sleep(2*time.Second),
 		
 		// Clica no primeiro link de CPF
-		chromedp.ActionFunc(func(ctx context.Context) error {
-			return nav.clickFirstCPFLink(ctx)
-		}),
+		chromedp.Click(`(//a[contains(@href, 'javascript:selecionarProposta')])[1]`, chromedp.BySearch, chromedp.FromNode(iframeNode)),
 		
-		// Aguarda página carregar
-		chromedp.Sleep(nav.timeouts.PageLoad),
+		// Aguarda próxima página carregar
+		chromedp.Sleep(5*time.Second),
 	)
-}
-
-// clickFirstCPFLink - clica no primeiro link de CPF da tabela
-func (nav *CaixaSearchNavigator) clickFirstCPFLink(ctx context.Context) error {
-	// XPath: primeiro link que contém "javascript:selecionarProposta"
-	xpath := `(//a[contains(@href, 'javascript:selecionarProposta')])[1]`
 	
-	return chromedp.Run(ctx,
-		chromedp.WaitVisible(xpath, chromedp.BySearch),
-		chromedp.Click(xpath, chromedp.BySearch),
-	)
+	if err != nil {
+		return err
+	}
+	
+	logger.Info("✓ Primeiro resultado clicado!")
+	return nil
 }
 
 // ExtractAgendamentoAssinatura - extrai data de agendamento de assinatura
@@ -102,6 +147,7 @@ func (nav *CaixaSearchNavigator) ExtractAgendamentoAssinatura(ctx context.Contex
 		return "", err
 	}
 	
+	agendamento = strings.TrimSpace(agendamento)
 	logger.Info(fmt.Sprintf("✓ Agendamento: %s", agendamento))
 	return agendamento, nil
 }

@@ -17,12 +17,14 @@ import (
 )
 
 func main() {
-	// Inicializa o logger
+		// Inicializa o logger
 	logger.Init()
+	
 	logger.Info("🚀 Iniciando RPA Service - Caixa Automation")
 
+
 	// Cria o handler
-	handler := handlers.NewHandler()
+	handler := handlers.NewHandler(false)
 
 	// Configura as rotas
 	router := mux.NewRouter()

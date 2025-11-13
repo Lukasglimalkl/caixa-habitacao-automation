@@ -21,8 +21,6 @@ func DefaultBrowserConfig(headless bool) BrowserConfig {
 		chromedp.Flag("disable-extensions", true),
 		chromedp.Flag("disable-web-security", true),
 		chromedp.Flag("disable-features", "IsolateOrigins,site-per-process"),
-		chromedp.Flag("timeout", "300000"),
-		chromedp.Flag("page-load-timeout", "300000"),
 		chromedp.WindowSize(1920, 1080),
 		chromedp.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"),
 	)

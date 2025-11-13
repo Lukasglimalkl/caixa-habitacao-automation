@@ -13,11 +13,6 @@ import (
 	"github.com/lukasglimalkl/caixa-habitacao-automation/rpa-service/pkg/logger"
 )
 
-// PropertyExtractor - interface para extração de dados do imóvel
-type PropertyExtractor interface {
-	ExtractPropertyData(ctx context.Context, iframeNode *cdp.Node, clientData *models.ClientData) error
-}
-
 // CaixaPropertyExtractor - implementação para extração de imóvel
 type CaixaPropertyExtractor struct{}
 

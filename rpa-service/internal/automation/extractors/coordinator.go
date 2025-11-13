@@ -12,32 +12,12 @@ import (
 
 // DataCoordinator - coordena todas as extrações
 type DataCoordinator struct {
-	personalExtractor  PersonalExtractor
-	contactExtractor   ContactExtractor
-	addressExtractor   AddressExtractor
-	bankingExtractor   BankingExtractor
-	propertyExtractor  PropertyExtractor
-	financialExtractor FinancialExtractor
-}
-
-// PersonalExtractor - interface para dados pessoais
-type PersonalExtractor interface {
-	ExtractPersonalData(ctx context.Context, iframeNode *cdp.Node, clientData *models.ClientData) error
-}
-
-// ContactExtractor - interface para dados de contato
-type ContactExtractor interface {
-	ExtractContactData(ctx context.Context, iframeNode *cdp.Node, clientData *models.ClientData) error
-}
-
-// AddressExtractor - interface para dados de endereço
-type AddressExtractor interface {
-	ExtractAddressData(ctx context.Context, iframeNode *cdp.Node, clientData *models.ClientData) error
-}
-
-// BankingExtractor - interface para dados bancários
-type BankingExtractor interface {
-	ExtractBankingData(ctx context.Context, iframeNode *cdp.Node, clientData *models.ClientData) error
+	personalExtractor  *CaixaPersonalExtractor
+	contactExtractor   *CaixaContactExtractor
+	addressExtractor   *CaixaAddressExtractor
+	bankingExtractor   *CaixaBankingExtractor
+	propertyExtractor  *CaixaPropertyExtractor
+	financialExtractor *CaixaFinancialExtractor
 }
 
 // NewDataCoordinator - cria novo coordenador de extração
