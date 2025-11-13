@@ -41,6 +41,21 @@ func (bot *CaixaBot) extractDadosParticipante(ctx context.Context) (*models.Clie
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			return bot.extractNome(ctx, iframeNode, &clientData)
 		}),
+
+		// 🆕 Extrai Ocupação
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			return bot.extractOcupacao(ctx, iframeNode, &clientData)
+		}),
+
+		// 🆕 Extrai Nacionalidade
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			return bot.extractNacionalidade(ctx, iframeNode, &clientData)
+		}),
+
+		// 🆕 Extrai RG (se não for CNH)
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			return bot.extractRG(ctx, iframeNode, &clientData)
+		}),
 		
 		// 🆕 Extrai Telefone Celular
 		chromedp.ActionFunc(func(ctx context.Context) error {
@@ -208,26 +223,6 @@ func (bot *CaixaBot) extractContaDebito(ctx context.Context, iframeNode *cdp.Nod
 	return nil
 }
 
-// extractTelefoneCelular - extrai o telefone celular do participante
-func (bot *CaixaBot) extractTelefoneCelular(ctx context.Context, iframeNode *cdp.Node, clientData *models.ClientData) error {
-	logger.Info("📱 Extraindo Telefone Celular...")
-	
-	// XPath para encontrar o telefone celular
-	xpath := `//tr[.//label[contains(., 'Telefone Celular:')]]/td[@class='alinha_esquerda'][1]`
-	
-	var telefoneCelular string
-	err := chromedp.Text(xpath, &telefoneCelular, chromedp.BySearch, chromedp.FromNode(iframeNode)).Do(ctx)
-	if err != nil {
-		logger.Error(fmt.Sprintf("Erro ao extrair telefone celular: %v", err))
-		return err
-	}
-	
-	clientData.TelefoneCelular = strings.TrimSpace(telefoneCelular)
-	logger.Info(fmt.Sprintf("✓ Telefone Celular: %s", clientData.TelefoneCelular))
-	
-	return nil
-}
-
 // scrollToEnderecoTable - faz scroll até a tabela de Endereço
 func (bot *CaixaBot) scrollToEnderecoTable(ctx context.Context) error {
 	logger.Info("📜 Fazendo scroll até tabela 'Endereço'...")
@@ -381,4 +376,171 @@ func (bot *CaixaBot) extractEndereco(ctx context.Context, iframeNode *cdp.Node, 
 	)
 	
 	return err
+}
+
+
+// extractOcupacao - extrai a ocupação
+func (bot *CaixaBot) extractOcupacao(ctx context.Context, iframeNode *cdp.Node, clientData *models.ClientData) error {
+	logger.Info("🔍 Extraindo Ocupação...")
+	
+	var bodyText string
+	err := chromedp.Text("body", &bodyText, chromedp.ByQuery, chromedp.FromNode(iframeNode)).Do(ctx)
+	
+	if err != nil {
+		logger.Error(fmt.Sprintf("❌ Erro ao extrair texto da página: %v", err))
+		return nil
+	}
+	
+	// Procura linha que contém "Ocupação:"
+	lines := strings.Split(bodyText, "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "Ocupação:") {
+			parts := strings.SplitN(line, ":", 2)
+			if len(parts) > 1 {
+				clientData.Ocupacao = strings.TrimSpace(parts[1])
+				logger.Info(fmt.Sprintf("✓ Ocupação: %s", clientData.Ocupacao))
+				return nil
+			}
+		}
+	}
+	
+	logger.Info("⚠️ Ocupação não encontrada")
+	return nil
+}
+
+// extractNacionalidade - extrai a nacionalidade
+func (bot *CaixaBot) extractNacionalidade(ctx context.Context, iframeNode *cdp.Node, clientData *models.ClientData) error {
+	logger.Info("🔍 Extraindo Nacionalidade...")
+	
+	var bodyText string
+	err := chromedp.Text("body", &bodyText, chromedp.ByQuery, chromedp.FromNode(iframeNode)).Do(ctx)
+	
+	if err != nil {
+		logger.Error(fmt.Sprintf("❌ Erro ao extrair texto da página: %v", err))
+		return nil
+	}
+	
+	// Procura linha que contém "Nacionalidade:"
+	lines := strings.Split(bodyText, "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "Nacionalidade:") {
+			parts := strings.SplitN(line, ":", 2)
+			if len(parts) > 1 {
+				clientData.Nacionalidade = strings.TrimSpace(parts[1])
+				logger.Info(fmt.Sprintf("✓ Nacionalidade: %s", clientData.Nacionalidade))
+				return nil
+			}
+		}
+	}
+	
+	logger.Info("⚠️ Nacionalidade não encontrada")
+	return nil
+}
+
+// extractRG - extrai o RG (se tipo de identificação não for CNH)
+func (bot *CaixaBot) extractRG(ctx context.Context, iframeNode *cdp.Node, clientData *models.ClientData) error {
+	logger.Info("🔍 Verificando tipo de identificação...")
+	
+	var bodyText string
+	err := chromedp.Text("body", &bodyText, chromedp.ByQuery, chromedp.FromNode(iframeNode)).Do(ctx)
+	
+	if err != nil {
+		logger.Error(fmt.Sprintf("❌ Erro ao extrair texto da página: %v", err))
+		return nil
+	}
+	
+	lines := strings.Split(bodyText, "\n")
+	
+	// Procura tipo de identificação
+	var tipoIdentificacao string
+	var numero string
+	
+	for _, line := range lines {
+		if strings.Contains(line, "Tipo de Identificação:") {
+			parts := strings.SplitN(line, ":", 2)
+			if len(parts) > 1 {
+				tipoIdentificacao = strings.TrimSpace(parts[1])
+				break
+			}
+		}
+	}
+	
+	if tipoIdentificacao == "" {
+		logger.Info("⚠️ Tipo de Identificação não encontrado")
+		return nil
+	}
+	
+	clientData.TipoIdentificacao = tipoIdentificacao
+	logger.Info(fmt.Sprintf("📋 Tipo de Identificação: %s", tipoIdentificacao))
+	
+	// Procura o número (serve para CNH ou RG)
+	for _, line := range lines {
+		// Pega linha que tem "Número:" mas NÃO tem "Número de" ou "Número do"
+		if strings.Contains(line, "Número:") && !strings.Contains(line, "Número de") && !strings.Contains(line, "Número do") {
+			parts := strings.SplitN(line, ":", 2)
+			if len(parts) > 1 {
+				numero = strings.TrimSpace(parts[1])
+				break
+			}
+		}
+	}
+	
+	if numero != "" {
+		clientData.RG = numero
+		logger.Info(fmt.Sprintf("✓ Número (%s): %s", tipoIdentificacao, numero))
+	} else {
+		logger.Info("⚠️ Número não encontrado")
+	}
+	
+	return nil
+}
+
+// extractTelefoneCelular - extrai o telefone celular do participante
+func (bot *CaixaBot) extractTelefoneCelular(ctx context.Context, iframeNode *cdp.Node, clientData *models.ClientData) error {
+	logger.Info("📱 Extraindo Telefone Celular...")
+	
+	var bodyText string
+	err := chromedp.Text("body", &bodyText, chromedp.ByQuery, chromedp.FromNode(iframeNode)).Do(ctx)
+	
+	if err != nil {
+		logger.Error(fmt.Sprintf("❌ Erro ao extrair texto da página: %v", err))
+		return nil
+	}
+	
+	lines := strings.Split(bodyText, "\n")
+	
+	// Tenta primeiro Telefone Celular
+	for _, line := range lines {
+		if strings.Contains(line, "Telefone Celular:") {
+			parts := strings.SplitN(line, ":", 2)
+			if len(parts) > 1 {
+				telefone := strings.TrimSpace(parts[1])
+				if telefone != "" {
+					clientData.TelefoneCelular = telefone
+					logger.Info(fmt.Sprintf("✓ Telefone Celular: %s", telefone))
+					return nil
+				}
+			}
+		}
+	}
+	
+	// Se celular vazio, tenta Telefone Residencial
+	logger.Info("⚠️ Telefone Celular vazio, tentando Telefone Residencial...")
+	
+	for _, line := range lines {
+		if strings.Contains(line, "Telefone Residencial:") {
+			parts := strings.SplitN(line, ":", 2)
+			if len(parts) > 1 {
+				telefone := strings.TrimSpace(parts[1])
+				if telefone != "" {
+					clientData.TelefoneCelular = telefone
+					logger.Info(fmt.Sprintf("✓ Telefone Residencial: %s", telefone))
+					return nil
+				}
+			}
+		}
+	}
+	
+	logger.Info("⚠️ Nenhum telefone encontrado")
+	return nil
 }

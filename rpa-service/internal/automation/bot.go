@@ -118,41 +118,85 @@ func (bot *CaixaBot) LoginAndSearch(req models.LoginAndSearchRequest) (*models.S
 	clientData.Complemento = proponenteData.Complemento
 
 	
-	// 10. 🆕 Clica no botão "Ir para"
+		// 10. 🆕 Clica no botão "Ir para" (abre o menu)
+if err := bot.clickIrPara(ctx); err != nil {
+	logger.Error(fmt.Sprintf("❌ Erro ao clicar em 'Ir para': %v", err))
+	return &models.SearchResponse{
+		Success: false,
+		Message: fmt.Sprintf("Erro ao clicar em 'Ir para': %v", err),
+	}, err
+}
+
+// 11. 🆕 Clica no menu "Imóvel" (tenta pelo dialog primeiro, depois fallback)
+logger.Info("🏠 Clicando no menu Imóvel...")
+if err := bot.clickMenuImovel(ctx); err != nil {
+	logger.Error(fmt.Sprintf("❌ Erro ao clicar no menu 'Imóvel' pelo dialog: %v", err))
+	logger.Info("🔄 Tentando método alternativo (clicar diretamente)...")
+	
+	// FALLBACK: Tenta clicar diretamente no botão Imóvel
+	if err := bot.clickImovelDirectly(ctx); err != nil {
+		logger.Error(fmt.Sprintf("❌ Método alternativo também falhou: %v", err))
+		return &models.SearchResponse{
+			Success: false,
+			Message: fmt.Sprintf("Erro ao clicar no menu 'Imóvel': %v", err),
+		}, err
+	}
+	
+	logger.Info("✓ Método alternativo funcionou!")
+}
+
+	// 12. 🆕 Extrai dados do Imóvel
+	logger.Info("🏠 Extraindo dados do Imóvel...")
+	imovelData, err := bot.extractDadosImovel(ctx)
+	if err != nil {
+		logger.Error(fmt.Sprintf("⚠️ Erro ao extrair dados do imóvel: %v", err))
+	} else {
+		clientData.EnderecoImovel = imovelData.EnderecoImovel
+		clientData.CEPImovel = imovelData.CEPImovel
+		
+		logger.Info(fmt.Sprintf("✓ Endereço Imóvel: %s", imovelData.EnderecoImovel))
+		logger.Info(fmt.Sprintf("✓ CEP Imóvel: %s", imovelData.CEPImovel))
+	}
+
+	// 13. 🆕 Clica novamente no botão "Ir para" (para acessar Valores da Operação)
 	if err := bot.clickIrPara(ctx); err != nil {
-		logger.Error(fmt.Sprintf("❌ Erro ao clicar em 'Ir para': %v", err))
+		logger.Error(fmt.Sprintf("❌ Erro ao clicar em 'Ir para' (2ª vez): %v", err))
 		return &models.SearchResponse{
 			Success: false,
 			Message: fmt.Sprintf("Erro ao clicar em 'Ir para': %v", err),
 		}, err
 	}
 
-
-	// 11. 🆕 Clica no menu "Imóvel"
-	if err := bot.clickMenuImovel(ctx); err != nil {
-		logger.Error(fmt.Sprintf("❌ Erro ao clicar no menu 'Imóvel': %v", err))
-		logger.Info("🔄 Tentando método alternativo (clicar diretamente)...")
-		
-		// FALLBACK: Tenta clicar diretamente no botão Imóvel
-		if err := bot.clickImovelDirectly(ctx); err != nil {
-			logger.Error(fmt.Sprintf("❌ Método alternativo também falhou: %v", err))
-			return &models.SearchResponse{
-				Success: false,
-				Message: fmt.Sprintf("Erro ao clicar no menu 'Imóvel': %v", err),
-			}, err
-		}
-		
-		logger.Info("✓ Método alternativo funcionou!")
+	// 14. 🆕 Clica em "Valores da Operação"
+	if err := bot.clickValoresOperacao(ctx); err != nil {
+		logger.Error(fmt.Sprintf("❌ Erro ao clicar em 'Valores da Operação': %v", err))
+		return &models.SearchResponse{
+			Success: false,
+			Message: fmt.Sprintf("Erro ao clicar em 'Valores da Operação': %v", err),
+		}, err
 	}
 
+	// 15. 🆕 Extrai Valor de Compra e Venda
+	valorCompraVenda, err := bot.extractValorCompraVenda(ctx)
+	if err != nil {
+		logger.Error(fmt.Sprintf("⚠️ Erro ao extrair valor de compra e venda: %v", err))
+	} else {
+		clientData.ValorCompraVenda = valorCompraVenda
+		logger.Info(fmt.Sprintf("✓ Valor Compra e Venda: %s", valorCompraVenda))
+	}
 
 	logger.Info("========================================")
 	logger.Info("✅ PROCESSO CONCLUÍDO!")
 	logger.Info(fmt.Sprintf("📝 Nome: %s", clientData.Nome))
 	logger.Info(fmt.Sprintf("📋 CPF: %s", clientData.CPF))
+	logger.Info(fmt.Sprintf("💼 Ocupação: %s", clientData.Ocupacao))
+	logger.Info(fmt.Sprintf("🌍 Nacionalidade: %s", clientData.Nacionalidade))
+	logger.Info(fmt.Sprintf("🆔 Tipo ID: %s | RG: %s", clientData.TipoIdentificacao, clientData.RG))
 	logger.Info(fmt.Sprintf("👥 Coobrigado: %s (%s)", clientData.CoobrigadoNome, clientData.CoobrigadoCPF))
 	logger.Info(fmt.Sprintf("📱 Telefone: %s", clientData.TelefoneCelular))
-	logger.Info(fmt.Sprintf("🏠 Endereço: %s %s, %s - %s/%s", clientData.TipoLogradouro, clientData.Logradouro, clientData.Numero, clientData.Municipio, clientData.UF))
+	logger.Info(fmt.Sprintf("🏠 Endereço Residencial: %s %s, %s - %s/%s", clientData.TipoLogradouro, clientData.Logradouro, clientData.Numero, clientData.Municipio, clientData.UF))
+	logger.Info(fmt.Sprintf("🏢 Endereço Imóvel: %s (CEP: %s)", clientData.EnderecoImovel, clientData.CEPImovel))
+	logger.Info(fmt.Sprintf("💰 Valor Compra e Venda: %s", clientData.ValorCompraVenda))
 	logger.Info(fmt.Sprintf("📄 Contrato: %s", clientData.NumeroContrato))
 	logger.Info(fmt.Sprintf("💳 Conta: %s (Ag: %s)", clientData.ContaCorrente, clientData.Agencia))
 	logger.Info(fmt.Sprintf("📅 Agendamento: %s", clientData.AgendamentoAssinatura))

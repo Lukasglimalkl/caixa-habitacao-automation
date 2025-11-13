@@ -20,6 +20,7 @@ type SearchRequest struct {
 }
 
 // ClientData - dados extraídos do portal da Caixa
+// ClientData - dados extraídos do portal da Caixa
 type ClientData struct {
 	// Dados do Proponente (clicando no link)
 	CPF                   string `json:"cpf"`
@@ -37,7 +38,7 @@ type ClientData struct {
 	// Dados de Contato
 	TelefoneCelular string `json:"telefone_celular,omitempty"`
 	
-	// Dados de Endereço
+	// Dados de Endereço Residencial
 	CEP              string `json:"cep,omitempty"`
 	TipoLogradouro   string `json:"tipo_logradouro,omitempty"`
 	Logradouro       string `json:"logradouro,omitempty"`
@@ -46,6 +47,19 @@ type ClientData struct {
 	Municipio        string `json:"municipio,omitempty"`
 	UF               string `json:"uf,omitempty"`
 	Complemento      string `json:"complemento,omitempty"`
+	
+	// 🆕 Dados Pessoais Adicionais
+	Ocupacao         string `json:"ocupacao,omitempty"`
+	Nacionalidade    string `json:"nacionalidade,omitempty"`
+	TipoIdentificacao string `json:"tipo_identificacao,omitempty"`
+	RG               string `json:"rg,omitempty"`
+	
+	// 🆕 Dados do Imóvel
+	EnderecoImovel string `json:"endereco_imovel,omitempty"`
+	CEPImovel      string `json:"cep_imovel,omitempty"`
+	
+	// 🆕 Dados Financeiros
+	ValorCompraVenda string `json:"valor_compra_venda,omitempty"`
 }
 
 // SearchResponse - resposta da busca
