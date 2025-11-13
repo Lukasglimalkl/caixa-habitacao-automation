@@ -11,19 +11,27 @@ import (
 	"github.com/lukasglimalkl/caixa-habitacao-automation/rpa-service/pkg/logger"
 )
 
+// CaixaBankingExtractor - implementação para extração bancária
+type CaixaBankingExtractor struct{}
+
+// NewBankingExtractor - cria novo extrator bancário
+func NewBankingExtractor() *CaixaBankingExtractor {
+	return &CaixaBankingExtractor{}
+}
+
 // ExtractBankingData - extrai dados bancários (conta de débito)
-func ExtractBankingData(ctx context.Context, iframeNode *cdp.Node, clientData *models.ClientData) error {
+func (e *CaixaBankingExtractor) ExtractBankingData(ctx context.Context, iframeNode *cdp.Node, clientData *models.ClientData) error {
 	logger.Info("💳 Extraindo dados bancários...")
 	
 	// Faz scroll até a tabela de conta
 	ScrollToTable(ctx, "Dados da Conta - Débito")
 	
 	// Extrai conta de débito
-	return extractContaDebito(ctx, iframeNode, clientData)
+	return e.extractContaDebito(ctx, iframeNode, clientData)
 }
 
 // extractContaDebito - extrai a conta de débito completa
-func extractContaDebito(ctx context.Context, iframeNode *cdp.Node, clientData *models.ClientData) error {
+func (e *CaixaBankingExtractor) extractContaDebito(ctx context.Context, iframeNode *cdp.Node, clientData *models.ClientData) error {
 	logger.Info("🔍 Extraindo Conta de Débito...")
 	
 	// XPath específico para encontrar a conta de débito
@@ -51,7 +59,7 @@ func extractContaDebito(ctx context.Context, iframeNode *cdp.Node, clientData *m
 	
 	// Separa agência e conta
 	if clientData.ContaDebitoCompleta != "" {
-		agencia, conta := separarContaDebito(clientData.ContaDebitoCompleta)
+		agencia, conta := e.separarContaDebito(clientData.ContaDebitoCompleta)
 		clientData.Agencia = agencia
 		clientData.ContaCorrente = conta
 		logger.Info(fmt.Sprintf("✓ Agência: %s | Conta: %s", agencia, conta))
@@ -64,7 +72,7 @@ func extractContaDebito(ctx context.Context, iframeNode *cdp.Node, clientData *m
 
 // separarContaDebito - separa agência e conta corrente
 // Formato esperado: "0347-3701-000573937131-3" ou similar
-func separarContaDebito(contaCompleta string) (agencia, conta string) {
+func (e *CaixaBankingExtractor) separarContaDebito(contaCompleta string) (agencia, conta string) {
 	logger.Info(fmt.Sprintf("🔧 Separando conta: %s", contaCompleta))
 	
 	// Remove espaços

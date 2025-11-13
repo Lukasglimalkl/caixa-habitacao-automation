@@ -12,6 +12,7 @@ import (
 // LoginNavigator - interface para navegação de login
 type LoginNavigator interface {
 	Login(ctx context.Context, username, password string) error
+	VerifyLoginSuccess(ctx context.Context) error
 }
 
 // CaixaLoginNavigator - implementação para portal da Caixa
@@ -75,8 +76,9 @@ func (nav *CaixaLoginNavigator) clickLoginButton(ctx context.Context) error {
 }
 
 // VerifyLoginSuccess - verifica se o login foi bem-sucedido
+// VerifyLoginSuccess - verifica se o login foi bem-sucedido
 func (nav *CaixaLoginNavigator) VerifyLoginSuccess(ctx context.Context) error {
-	logger.Info("✓ Verificando sucesso do login...")
+		logger.Info("✓ Verificando sucesso do login...")
 	
 	var pageTitle string
 	err := chromedp.Title(&pageTitle).Do(ctx)

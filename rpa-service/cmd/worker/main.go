@@ -61,7 +61,7 @@ func main() {
 			q.UpdateJob(job)
 
 			// Executa automação
-			bot := automation.NewCaixaBot()
+			bot := automation.NewCaixaBot(true)
 			
 			req := models.LoginAndSearchRequest{
 				Username: job.Username,
@@ -69,8 +69,8 @@ func main() {
 				CPF:      job.CPF,
 			}
 
-			response, err := bot.LoginAndSearch(req)
-
+			response, err := bot.LoginAndSearch(req.Username, req.Password, req.CPF)
+			
 			if err != nil {
 				logger.Error(fmt.Sprintf("[%s] ❌ Erro no job %s: %v", workerID, job.ID, err))
 				q.FailJob(job.ID, err.Error())

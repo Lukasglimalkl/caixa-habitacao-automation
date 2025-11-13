@@ -14,6 +14,7 @@ import (
 type SearchNavigator interface {
 	SearchByCPF(ctx context.Context, cpf string) error
 	ClickFirstResult(ctx context.Context) error
+	ExtractAgendamentoAssinatura(ctx context.Context, iframeWaiter IframeWaiter) (string, error)
 }
 
 // CaixaSearchNavigator - implementação para busca no portal da Caixa

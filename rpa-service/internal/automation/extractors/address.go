@@ -11,8 +11,16 @@ import (
 	"github.com/lukasglimalkl/caixa-habitacao-automation/rpa-service/pkg/logger"
 )
 
+// CaixaAddressExtractor - implementação para extração de endereço
+type CaixaAddressExtractor struct{}
+
+// NewAddressExtractor - cria novo extrator de endereço
+func NewAddressExtractor() *CaixaAddressExtractor {
+	return &CaixaAddressExtractor{}
+}
+
 // ExtractAddressData - extrai todos os dados de endereço
-func ExtractAddressData(ctx context.Context, iframeNode *cdp.Node, clientData *models.ClientData) error {
+func (e *CaixaAddressExtractor) ExtractAddressData(ctx context.Context, iframeNode *cdp.Node, clientData *models.ClientData) error {
 	logger.Info("🏠 Extraindo dados de endereço...")
 	
 	// Faz scroll até a tabela de endereço
@@ -22,18 +30,18 @@ func ExtractAddressData(ctx context.Context, iframeNode *cdp.Node, clientData *m
 	baseXPath := `//table[.//th[contains(text(), 'Endereço') and not(contains(text(), 'Correspondência'))]]`
 	
 	// Extrai cada campo do endereço
-	extractCEP(ctx, iframeNode, baseXPath, clientData)
-	extractTipoLogradouro(ctx, iframeNode, baseXPath, clientData)
-	extractLogradouro(ctx, iframeNode, baseXPath, clientData)
-	extractNumeroEndereco(ctx, iframeNode, baseXPath, clientData)
-	extractBairro(ctx, iframeNode, baseXPath, clientData)
-	extractMunicipioUF(ctx, iframeNode, baseXPath, clientData)
-	extractComplemento(ctx, iframeNode, baseXPath, clientData)
+	e.extractCEP(ctx, iframeNode, baseXPath, clientData)
+	e.extractTipoLogradouro(ctx, iframeNode, baseXPath, clientData)
+	e.extractLogradouro(ctx, iframeNode, baseXPath, clientData)
+	e.extractNumeroEndereco(ctx, iframeNode, baseXPath, clientData)
+	e.extractBairro(ctx, iframeNode, baseXPath, clientData)
+	e.extractMunicipioUF(ctx, iframeNode, baseXPath, clientData)
+	e.extractComplemento(ctx, iframeNode, baseXPath, clientData)
 	
 	return nil
 }
 
-func extractCEP(ctx context.Context, iframeNode *cdp.Node, baseXPath string, clientData *models.ClientData) {
+func (e *CaixaAddressExtractor) extractCEP(ctx context.Context, iframeNode *cdp.Node, baseXPath string, clientData *models.ClientData) {
 	xpath := baseXPath + `//tr[.//label[contains(., 'CEP:')]]/td[@class='alinha_esquerda'][1]`
 	var cep string
 	err := chromedp.Text(xpath, &cep, chromedp.BySearch, chromedp.FromNode(iframeNode)).Do(ctx)
@@ -43,7 +51,7 @@ func extractCEP(ctx context.Context, iframeNode *cdp.Node, baseXPath string, cli
 	}
 }
 
-func extractTipoLogradouro(ctx context.Context, iframeNode *cdp.Node, baseXPath string, clientData *models.ClientData) {
+func (e *CaixaAddressExtractor) extractTipoLogradouro(ctx context.Context, iframeNode *cdp.Node, baseXPath string, clientData *models.ClientData) {
 	xpath := baseXPath + `//tr[.//label[contains(., 'Tipo de Logradouro:')]]/td[@class='alinha_esquerda'][last()]`
 	var tipoLogradouro string
 	err := chromedp.Text(xpath, &tipoLogradouro, chromedp.BySearch, chromedp.FromNode(iframeNode)).Do(ctx)
@@ -53,7 +61,7 @@ func extractTipoLogradouro(ctx context.Context, iframeNode *cdp.Node, baseXPath 
 	}
 }
 
-func extractLogradouro(ctx context.Context, iframeNode *cdp.Node, baseXPath string, clientData *models.ClientData) {
+func (e *CaixaAddressExtractor) extractLogradouro(ctx context.Context, iframeNode *cdp.Node, baseXPath string, clientData *models.ClientData) {
 	xpath := baseXPath + `//tr[.//label[contains(., 'Logradouro:')]]/td[@class='alinha_esquerda'][1]`
 	var logradouro string
 	err := chromedp.Text(xpath, &logradouro, chromedp.BySearch, chromedp.FromNode(iframeNode)).Do(ctx)
@@ -63,7 +71,7 @@ func extractLogradouro(ctx context.Context, iframeNode *cdp.Node, baseXPath stri
 	}
 }
 
-func extractNumeroEndereco(ctx context.Context, iframeNode *cdp.Node, baseXPath string, clientData *models.ClientData) {
+func (e *CaixaAddressExtractor) extractNumeroEndereco(ctx context.Context, iframeNode *cdp.Node, baseXPath string, clientData *models.ClientData) {
 	xpath := baseXPath + `//tr[.//label[contains(., 'Número:')]]/td[@class='alinha_esquerda'][last()]`
 	var numero string
 	err := chromedp.Text(xpath, &numero, chromedp.BySearch, chromedp.FromNode(iframeNode)).Do(ctx)
@@ -73,7 +81,7 @@ func extractNumeroEndereco(ctx context.Context, iframeNode *cdp.Node, baseXPath 
 	}
 }
 
-func extractBairro(ctx context.Context, iframeNode *cdp.Node, baseXPath string, clientData *models.ClientData) {
+func (e *CaixaAddressExtractor) extractBairro(ctx context.Context, iframeNode *cdp.Node, baseXPath string, clientData *models.ClientData) {
 	xpath := baseXPath + `//tr[.//label[contains(., 'Bairro:')]]/td[@class='alinha_esquerda'][last()]`
 	var bairro string
 	err := chromedp.Text(xpath, &bairro, chromedp.BySearch, chromedp.FromNode(iframeNode)).Do(ctx)
@@ -83,7 +91,7 @@ func extractBairro(ctx context.Context, iframeNode *cdp.Node, baseXPath string, 
 	}
 }
 
-func extractMunicipioUF(ctx context.Context, iframeNode *cdp.Node, baseXPath string, clientData *models.ClientData) {
+func (e *CaixaAddressExtractor) extractMunicipioUF(ctx context.Context, iframeNode *cdp.Node, baseXPath string, clientData *models.ClientData) {
 	xpath := baseXPath + `//tr[.//label[contains(., 'Município - UF:')]]/td[@class='alinha_esquerda']`
 	var municipioUF string
 	err := chromedp.Text(xpath, &municipioUF, chromedp.BySearch, chromedp.FromNode(iframeNode)).Do(ctx)
@@ -101,7 +109,7 @@ func extractMunicipioUF(ctx context.Context, iframeNode *cdp.Node, baseXPath str
 	}
 }
 
-func extractComplemento(ctx context.Context, iframeNode *cdp.Node, baseXPath string, clientData *models.ClientData) {
+func (e *CaixaAddressExtractor) extractComplemento(ctx context.Context, iframeNode *cdp.Node, baseXPath string, clientData *models.ClientData) {
 	xpath := baseXPath + `//tr[.//label[contains(., 'Complemento:')]]/td[@class='alinha_esquerda'][1]`
 	var complemento string
 	chromedp.Text(xpath, &complemento, chromedp.BySearch, chromedp.FromNode(iframeNode)).Do(ctx)

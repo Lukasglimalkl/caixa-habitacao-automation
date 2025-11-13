@@ -28,7 +28,7 @@ func main() {
 	router := mux.NewRouter()
 
 	// Health check
-	router.HandleFunc("/health", handler.HealthCheck).Methods("GET")
+	router.HandleFunc("/health", handler.Health).Methods("GET")
 
 	// Rota principal - Login + Busca
 	router.HandleFunc("/api/login-and-search", handler.LoginAndSearch).Methods("POST")
