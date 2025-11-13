@@ -117,6 +117,7 @@ func (bot *CaixaBot) LoginAndSearch(req models.LoginAndSearchRequest) (*models.S
 	clientData.UF = proponenteData.UF
 	clientData.Complemento = proponenteData.Complemento
 
+	
 	// 10. 🆕 Clica no botão "Ir para"
 	if err := bot.clickIrPara(ctx); err != nil {
 		logger.Error(fmt.Sprintf("❌ Erro ao clicar em 'Ir para': %v", err))
@@ -130,11 +131,20 @@ func (bot *CaixaBot) LoginAndSearch(req models.LoginAndSearchRequest) (*models.S
 	// 11. 🆕 Clica no menu "Imóvel"
 	if err := bot.clickMenuImovel(ctx); err != nil {
 		logger.Error(fmt.Sprintf("❌ Erro ao clicar no menu 'Imóvel': %v", err))
-		return &models.SearchResponse{
-			Success: false,
-			Message: fmt.Sprintf("Erro ao clicar no menu 'Imóvel': %v", err),
-		}, err
+		logger.Info("🔄 Tentando método alternativo (clicar diretamente)...")
+		
+		// FALLBACK: Tenta clicar diretamente no botão Imóvel
+		if err := bot.clickImovelDirectly(ctx); err != nil {
+			logger.Error(fmt.Sprintf("❌ Método alternativo também falhou: %v", err))
+			return &models.SearchResponse{
+				Success: false,
+				Message: fmt.Sprintf("Erro ao clicar no menu 'Imóvel': %v", err),
+			}, err
+		}
+		
+		logger.Info("✓ Método alternativo funcionou!")
 	}
+
 
 	logger.Info("========================================")
 	logger.Info("✅ PROCESSO CONCLUÍDO!")
