@@ -37,11 +37,14 @@ func NewCaixaParticipantsNavigator(timeouts config.Timeouts, maxRetries config.M
 func (nav *CaixaParticipantsNavigator) ClickParticipantes(ctx context.Context, iframeWaiter IframeWaiter) error {
 	logger.Info("👥 Clicando no menu Participantes...")
 	
-	// Aguarda iframe
-	iframeNode, err := iframeWaiter.WaitForIframe(ctx, "Menu Principal")
+	// Busca iframe
+	iframeNode, err := iframeWaiter.WaitForIframe(ctx, "Participantes")
 	if err != nil {
+		logger.Error("❌ Iframe não encontrado!")
 		return err
 	}
+	
+	logger.Info("✅ Iframe encontrado! Procurando botão...")
 	
 	// Lista de seletores possíveis para o botão Participantes
 	selectors := []string{
@@ -57,17 +60,18 @@ func (nav *CaixaParticipantsNavigator) ClickParticipantes(ctx context.Context, i
 		err := chromedp.Nodes(selector, &nodes, chromedp.ByID, chromedp.FromNode(iframeNode)).Do(ctx)
 		
 		if err == nil && len(nodes) > 0 {
-			logger.Info(fmt.Sprintf("✓ Botão Participantes encontrado: %s", selector))
+			logger.Info(fmt.Sprintf("✅ Botão Participantes encontrado: %s", selector))
 			
 			err = chromedp.Click(selector, chromedp.ByID, chromedp.FromNode(iframeNode)).Do(ctx)
 			if err == nil {
-				logger.Info("✓ Clique realizado com sucesso!")
+				logger.Info("✅ Clique realizado com sucesso!")
 				time.Sleep(nav.timeouts.AfterClick)
 				return nil
 			}
 		}
 	}
 	
+	logger.Error("❌ Botão Participantes não encontrado!")
 	return fmt.Errorf("botão Participantes não encontrado")
 }
 
@@ -79,11 +83,14 @@ func (nav *CaixaParticipantsNavigator) ExtractCoobrigado(ctx context.Context, if
 	coobrigadoCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	
-	iframeNode, err := iframeWaiter.WaitForIframe(coobrigadoCtx, "Tabela Participantes")
+	// Busca iframe
+	iframeNode, err := iframeWaiter.WaitForIframe(coobrigadoCtx, "Coobrigado")
 	if err != nil {
-		logger.Info("⚠️ Erro ao buscar iframe para coobrigado, continuando sem coobrigado")
-		return "", "", nil
+		logger.Error("❌ Iframe não encontrado!")
+		return "", "", err
 	}
+	
+	logger.Info("✅ Iframe encontrado! Procurando coobrigado...")
 	
 	// Extrai CPF e Nome do coobrigado
 	cpf, nome, err := nav.extractCoobrigadoFromTable(coobrigadoCtx, iframeNode)
@@ -92,7 +99,7 @@ func (nav *CaixaParticipantsNavigator) ExtractCoobrigado(ctx context.Context, if
 		return "", "", nil
 	}
 	
-	logger.Info(fmt.Sprintf("✓ Coobrigado: %s (%s)", nome, cpf))
+	logger.Info(fmt.Sprintf("✅ Coobrigado encontrado: %s (%s)", nome, cpf))
 	return cpf, nome, nil
 }
 
@@ -110,7 +117,7 @@ func (nav *CaixaParticipantsNavigator) extractCoobrigadoFromTable(ctx context.Co
 	}
 	
 	cpf = strings.TrimSpace(cpf)
-	logger.Info(fmt.Sprintf("✓ CPF Coobrigado: %s", cpf))
+	logger.Info(fmt.Sprintf("✅ CPF Coobrigado: %s", cpf))
 	
 	// XPath para nome do coobrigado
 	xpathNome := `//tr[@id='Item2']//td[2]`
@@ -122,7 +129,7 @@ func (nav *CaixaParticipantsNavigator) extractCoobrigadoFromTable(ctx context.Co
 	}
 	
 	nome = strings.TrimSpace(nome)
-	logger.Info(fmt.Sprintf("✓ Nome Coobrigado: %s", nome))
+	logger.Info(fmt.Sprintf("✅ Nome Coobrigado: %s", nome))
 	
 	return cpf, nome, nil
 }
@@ -131,12 +138,30 @@ func (nav *CaixaParticipantsNavigator) extractCoobrigadoFromTable(ctx context.Co
 func (nav *CaixaParticipantsNavigator) ClickProponenteCPF(ctx context.Context, iframeWaiter IframeWaiter) error {
 	logger.Info("👤 Clicando no CPF do PROPONENTE...")
 	
+	// Busca iframe UMA VEZ SÓ
+	iframeNode, err := iframeWaiter.WaitForIframe(ctx, "Proponente")
+	if err != nil {
+		logger.Error("❌ Iframe não encontrado!")
+		return err
+	}
+	
+	logger.Info("✅ Iframe encontrado! Procurando CPF do proponente...")
+	
+	// XPath para o CPF do primeiro participante (proponente)
+	xpath := `//tr[@id='Item1']//td[contains(@onclick, 'exibirDetalhesParticipante')]`
+	
+	// Tenta clicar com retries
 	for tentativa := 1; tentativa <= nav.maxRetries.ElementClick; tentativa++ {
-		logger.Info(fmt.Sprintf("👤 Tentativa %d/%d", tentativa, nav.maxRetries.ElementClick))
+		logger.Info(fmt.Sprintf("🎯 Tentativa %d/%d de clicar no CPF", tentativa, nav.maxRetries.ElementClick))
 		
-		err := nav.clickProponenteCPFSingleAttempt(ctx, iframeWaiter)
+		err := chromedp.Run(ctx,
+			chromedp.WaitVisible(xpath, chromedp.BySearch, chromedp.FromNode(iframeNode)),
+			chromedp.Click(xpath, chromedp.BySearch, chromedp.FromNode(iframeNode)),
+			chromedp.Sleep(nav.timeouts.PageLoad),
+		)
+		
 		if err == nil {
-			logger.Info("✅ Clique no CPF bem-sucedido!")
+			logger.Info("✅ Clique no CPF do proponente realizado com sucesso!")
 			return nil
 		}
 		
@@ -148,22 +173,6 @@ func (nav *CaixaParticipantsNavigator) ClickProponenteCPF(ctx context.Context, i
 		}
 	}
 	
+	logger.Error(fmt.Sprintf("❌ Todas as %d tentativas falharam!", nav.maxRetries.ElementClick))
 	return fmt.Errorf("falhou após %d tentativas", nav.maxRetries.ElementClick)
-}
-
-// clickProponenteCPFSingleAttempt - uma tentativa de clicar no CPF
-func (nav *CaixaParticipantsNavigator) clickProponenteCPFSingleAttempt(ctx context.Context, iframeWaiter IframeWaiter) error {
-	iframeNode, err := iframeWaiter.WaitForIframe(ctx, "Página Participantes")
-	if err != nil {
-		return err
-	}
-	
-	// XPath para o CPF do primeiro participante (proponente)
-	xpath := `//tr[@id='Item1']//td[contains(@onclick, 'exibirDetalhesParticipante')]`
-	
-	return chromedp.Run(ctx,
-		chromedp.WaitVisible(xpath, chromedp.BySearch, chromedp.FromNode(iframeNode)),
-		chromedp.Click(xpath, chromedp.BySearch, chromedp.FromNode(iframeNode)),
-		chromedp.Sleep(nav.timeouts.PageLoad),
-	)
 }

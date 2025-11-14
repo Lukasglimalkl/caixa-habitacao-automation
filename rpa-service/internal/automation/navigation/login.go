@@ -94,31 +94,33 @@ func (nav *CaixaLoginNavigator) Login(ctx context.Context, username, password st
 		
 		chromedp.Sleep(1*time.Second),
 		
-		// Clica no botão
+// Clica no botão
 		chromedp.ActionFunc(func(ctx context.Context) error {
-			logger.Info("🎯 Clicando no botão de login com JavaScript...")
+			logger.Info("🎯 Clicando no botão de login...")
 			script := `document.querySelector('#btn_login').click();`
 			return chromedp.Evaluate(script, nil).Do(ctx)
 		}),
 		
-		// IMPORTANTE: Aguarda navegação e página carregar
-		chromedp.Sleep(8*time.Second), // Aumentado para 8 segundos
+		// Aguarda navegação COMPLETA
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			logger.Info("⏳ Aguardando redirecionamento pós-login...")
+			return nil
+		}),
+		chromedp.Sleep(8*time.Second),
 		
-		// Aguarda body estar presente na nova página
 		chromedp.WaitReady("body", chromedp.ByQuery),
 		
-		// Debug: Verifica URL após login
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			var currentURL string
 			chromedp.Evaluate(`window.location.href`, &currentURL).Do(ctx)
-			logger.Info(fmt.Sprintf("📍 URL após login: %s", currentURL))
+			logger.Info(fmt.Sprintf("📍 URL atual: %s", currentURL))
+			logger.Info("✅ Página pós-login carregada!")
 			return nil
 		}),
 	)
 	
 	return err
 }
-
 // NewCaixaLoginNavigator - cria novo navegador de login
 func NewCaixaLoginNavigator(timeouts config.Timeouts, maxRetries config.MaxRetries) *CaixaLoginNavigator {
 	return &CaixaLoginNavigator{

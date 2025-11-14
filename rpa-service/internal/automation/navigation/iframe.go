@@ -32,25 +32,33 @@ func NewIframeWaiter(maxRetries config.MaxRetries, timeouts config.Timeouts) *De
 
 // WaitForIframe - aguarda o iframe aparecer e retorna o node
 func (w *DefaultIframeWaiter) WaitForIframe(ctx context.Context, pageName string) (*cdp.Node, error) {
-	logger.Info(fmt.Sprintf("🎯 [%s] Aguardando iframe...", pageName))
+	logger.Info(fmt.Sprintf("⏳ [%s] Procurando iframe...", pageName))
+	
+	// Aguarda inicial
+	time.Sleep(3 * time.Second)
 	
 	for tentativa := 1; tentativa <= w.maxRetries; tentativa++ {
 		var nodes []*cdp.Node
-		err := chromedp.Nodes(`iframe[id^="frameConteudo"]`, &nodes, chromedp.BySearch).Do(ctx)
+		
+		// SELETOR CORRETO: busca por src="blank.jsp"
+		err := chromedp.Run(ctx,
+			chromedp.Nodes(`iframe[src="blank.jsp"]`, &nodes, chromedp.BySearch, chromedp.AtLeast(0)),
+		)
 		
 		if err == nil && len(nodes) > 0 {
-			logger.Info(fmt.Sprintf("✓ [%s] Iframe encontrado! (tentativa %d)", pageName, tentativa))
+			logger.Info(fmt.Sprintf("✅ [%s] Iframe encontrado na tentativa %d!", pageName, tentativa))
 			time.Sleep(2 * time.Second)
 			return nodes[0], nil
 		}
 		
-		if tentativa%5 == 0 {
-			logger.Info(fmt.Sprintf("⏳ [%s] Aguardando... (%d/%d)", pageName, tentativa, w.maxRetries))
+		if tentativa%3 == 0 {
+			logger.Info(fmt.Sprintf("⏳ [%s] Tentativa %d/%d...", pageName, tentativa, w.maxRetries))
 		}
 		
 		time.Sleep(w.waitTime)
 	}
 	
+	logger.Error(fmt.Sprintf("❌ [%s] Iframe não encontrado após %d tentativas!", pageName, w.maxRetries))
 	return nil, fmt.Errorf("iframe não encontrado após %d tentativas", w.maxRetries)
 }
 
@@ -60,7 +68,10 @@ func (w *DefaultIframeWaiter) WaitForIframeWithSelector(ctx context.Context, pag
 	
 	for tentativa := 1; tentativa <= w.maxRetries; tentativa++ {
 		var nodes []*cdp.Node
-		err := chromedp.Nodes(selector, &nodes, chromedp.BySearch).Do(ctx)
+		
+		err := chromedp.Run(ctx,
+			chromedp.Nodes(selector, &nodes, chromedp.BySearch, chromedp.AtLeast(0)),
+		)
 		
 		if err == nil && len(nodes) > 0 {
 			logger.Info(fmt.Sprintf("✓ [%s] Iframe encontrado!", pageName))
