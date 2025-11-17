@@ -5,16 +5,17 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/chromedp"
 	"github.com/lukasglimalkl/caixa-habitacao-automation/rpa-service/internal/automation/config"
 	"github.com/lukasglimalkl/caixa-habitacao-automation/rpa-service/pkg/logger"
 )
 
 // MenuNavigator - interface para navegação de menu
+// MenuNavigator - interface para navegação de menu
 type MenuNavigator interface {
 	ClickIrPara(ctx context.Context, iframeWaiter IframeWaiter) error
-	ClickMenuOption(ctx context.Context, iframeWaiter IframeWaiter, optionID string, optionName string) error
+	ClickMenuOption(ctx context.Context, iframeWaiter IframeWaiter, menuName, optionID string) error
+	ClickMenuOptionDirect(ctx context.Context, iframeWaiter IframeWaiter, menuName, optionID string) error  // NOVA
 }
 
 // CaixaMenuNavigator - implementação para menu da Caixa
@@ -50,39 +51,88 @@ func (nav *CaixaMenuNavigator) ClickIrPara(ctx context.Context, iframeWaiter Ifr
 	)
 }
 
-// ClickMenuOption - clica em uma opção específica do menu
-func (nav *CaixaMenuNavigator) ClickMenuOption(ctx context.Context, iframeWaiter IframeWaiter, optionID string, optionName string) error {
-	logger.Info(fmt.Sprintf("🏠 Clicando no menu '%s'...", optionName))
+// ClickMenuOption - clica em uma opção do menu "Ir para"
+func (nav *CaixaMenuNavigator) ClickMenuOption(ctx context.Context, iframeWaiter IframeWaiter, menuName, optionID string) error {
+	logger.Info(fmt.Sprintf("🏠 Clicando no menu '%s'...", menuName))
 	
-	iframeNode, err := iframeWaiter.WaitForIframe(ctx, fmt.Sprintf("Menu %s", optionName))
+	// Busca iframe
+	iframeNode, err := iframeWaiter.WaitForIframe(ctx, fmt.Sprintf("Menu %s", menuName))
 	if err != nil {
+		logger.Error("❌ Iframe não encontrado!")
 		return err
 	}
 	
-	// Lista de possíveis IDs (com variações Check/Desab)
-	possibleIDs := []string{
-		optionID,
-		optionID + "Check",
-		optionID + "Desab",
-		optionID + "DesabCheck",
+	logger.Info("✅ Iframe encontrado! Procurando opção do menu...")
+	
+	// Lista de seletores possíveis baseado no optionID (ex: "imovelPI")
+	selectors := []string{
+		fmt.Sprintf("#%sDesabCheck", optionID),  // #imovelPIDesabCheck
+		fmt.Sprintf("#%s", optionID),            // #imovelPI
+		fmt.Sprintf("#%sCheck", optionID),       // #imovelPICheck
+		fmt.Sprintf("#%sDesab", optionID),       // #imovelPIDesab
 	}
 	
-	// Tenta cada ID
-	for _, id := range possibleIDs {
-		var nodes []*cdp.Node
-		err := chromedp.Nodes("#"+id, &nodes, chromedp.BySearch, chromedp.FromNode(iframeNode)).Do(ctx)
+	// Tenta cada seletor
+	for _, selector := range selectors {
+		logger.Info(fmt.Sprintf("🔍 Tentando seletor: %s", selector))
 		
-		if err == nil && len(nodes) > 0 {
-			logger.Info(fmt.Sprintf("✓ Botão '%s' encontrado: #%s", optionName, id))
-			
-			err = chromedp.Click("#"+id, chromedp.BySearch, chromedp.FromNode(iframeNode)).Do(ctx)
-			if err == nil {
-				logger.Info(fmt.Sprintf("✓ Botão '%s' clicado!", optionName))
-				time.Sleep(nav.timeouts.AfterClick)
-				return nil
-			}
+		err := chromedp.Run(ctx,
+			chromedp.Sleep(1*time.Second),
+			chromedp.Click(selector, chromedp.ByID, chromedp.FromNode(iframeNode)),
+		)
+		
+		if err == nil {
+			logger.Info(fmt.Sprintf("✅ Menu '%s' clicado: %s", menuName, selector))
+			time.Sleep(nav.timeouts.AfterClick)
+			return nil
 		}
+		
+		logger.Info(fmt.Sprintf("⚠️ Seletor %s não funcionou", selector))
 	}
 	
-	return fmt.Errorf("botão '%s' não encontrado", optionName)
+	logger.Error(fmt.Sprintf("❌ Menu '%s' não encontrado!", menuName))
+	return fmt.Errorf("menu '%s' não encontrado", menuName)
+}
+
+// ClickMenuOptionDirect - clica direto em uma opção do menu (sem abrir "Ir para" antes)
+func (nav *CaixaMenuNavigator) ClickMenuOptionDirect(ctx context.Context, iframeWaiter IframeWaiter, menuName, optionID string) error {
+	logger.Info(fmt.Sprintf("🏠 Clicando direto no menu '%s'...", menuName))
+	
+	// Busca iframe
+	iframeNode, err := iframeWaiter.WaitForIframe(ctx, fmt.Sprintf("Menu %s", menuName))
+	if err != nil {
+		logger.Error("❌ Iframe não encontrado!")
+		return err
+	}
+	
+	logger.Info("✅ Iframe encontrado! Procurando opção do menu...")
+	
+	// Lista de seletores possíveis baseado no optionID (ex: "valOperacaoPI")
+	selectors := []string{
+		fmt.Sprintf("#%sDesabCheck", optionID),  // #valOperacaoPIDesabCheck
+		fmt.Sprintf("#%s", optionID),            // #valOperacaoPI
+		fmt.Sprintf("#%sCheck", optionID),       // #valOperacaoPICheck
+		fmt.Sprintf("#%sDesab", optionID),       // #valOperacaoPIDesab
+	}
+	
+	// Tenta cada seletor
+	for _, selector := range selectors {
+		logger.Info(fmt.Sprintf("🔍 Tentando seletor: %s", selector))
+		
+		err := chromedp.Run(ctx,
+			chromedp.Sleep(1*time.Second),
+			chromedp.Click(selector, chromedp.ByID, chromedp.FromNode(iframeNode)),
+		)
+		
+		if err == nil {
+			logger.Info(fmt.Sprintf("✅ Menu '%s' clicado: %s", menuName, selector))
+			time.Sleep(nav.timeouts.AfterClick)
+			return nil
+		}
+		
+		logger.Info(fmt.Sprintf("⚠️ Seletor %s não funcionou", selector))
+	}
+	
+	logger.Error(fmt.Sprintf("❌ Menu '%s' não encontrado!", menuName))
+	return fmt.Errorf("menu '%s' não encontrado", menuName)
 }

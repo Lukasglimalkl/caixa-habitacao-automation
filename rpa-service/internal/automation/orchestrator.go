@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/chromedp/chromedp"
 	"github.com/lukasglimalkl/caixa-habitacao-automation/rpa-service/internal/automation/extractors"
 	"github.com/lukasglimalkl/caixa-habitacao-automation/rpa-service/internal/automation/navigation"
 	"github.com/lukasglimalkl/caixa-habitacao-automation/rpa-service/internal/models"
@@ -41,71 +40,69 @@ func NewOrchestrator(bot *CaixaBot) *Orchestrator {
 	}
 }
 
-// Execute - executa o fluxo completo de automação
 func (o *Orchestrator) Execute(ctx context.Context, username, password, cpf string) (*models.ClientData, error) {
 	logger.Info("🚀 Iniciando processo de automação completo...")
 	logger.Info("========================================")
-	logger.Info("📋 Configurações:")
-	logger.Info(fmt.Sprintf("   - Timeout Total: %v", o.bot.timeouts.BrowserContext))
-	logger.Info(fmt.Sprintf("   - Headless: %v", o.bot.browserConfig.Headless))
+	
+	// ETAPA 1: LOGIN
+	logger.Info("ETAPA 1: LOGIN")
 	logger.Info("========================================")
-	
-	// ... resto do código
-	// Cria context do navegador
-	browserCtx, cancel := o.bot.createBrowserContext(ctx)
-	defer cancel()
-	
-	// Context com timeout
-	timeoutCtx, timeoutCancel := context.WithTimeout(browserCtx, o.bot.timeouts.BrowserContext)
-	defer timeoutCancel()
-	
-	// Inicia navegador
-	logger.Info("🌐 Inicializando navegador Chrome...")
-	if err := chromedp.Run(timeoutCtx); err != nil {
-		logger.Error(fmt.Sprintf("❌ Erro ao iniciar navegador: %v", err))
-		return nil, fmt.Errorf("erro ao iniciar navegador: %w", err)
-	}
-	logger.Info("✅ Navegador inicializado com sucesso!")
-	// 1. Login
-	if err := o.executeLogin(timeoutCtx, username, password); err != nil {
+	if err := o.executeLogin(ctx, username, password); err != nil {
 		return nil, fmt.Errorf("erro no login: %w", err)
 	}
+	logger.Info("✅ Login realizado com sucesso!")
 	
-	// 2. Busca por CPF
-	if err := o.executeSearch(timeoutCtx, cpf); err != nil {
+	// ETAPA 2: BUSCA POR CPF
+	logger.Info("========================================")
+	logger.Info("ETAPA 2: BUSCA POR CPF")
+	logger.Info("========================================")
+	if err := o.executeSearch(ctx, cpf); err != nil {
 		return nil, fmt.Errorf("erro na busca: %w", err)
 	}
+	logger.Info("✅ Busca concluída com sucesso!")
 	
-	// 3. Extrai dados do participante
-	clientData, err := o.extractParticipantData(timeoutCtx)
+	// Cria clientData vazio
+	clientData := &models.ClientData{}
+	
+	// ETAPA 3: EXTRAÇÃO DE VALORES DA OPERAÇÃO (PRIMEIRO!)
+	logger.Info("========================================")
+	logger.Info("ETAPA 3: EXTRAÇÃO DE VALORES DA OPERAÇÃO")
+	logger.Info("========================================")
+	if err := o.extractFinancialData(ctx, clientData); err != nil {
+		logger.Error("⚠️ Erro ao extrair dados financeiros: " + err.Error())
+		// Não retorna erro, continua
+	}
+	
+	// ETAPA 4: EXTRAÇÃO DE DADOS DO PARTICIPANTE
+	logger.Info("========================================")
+	logger.Info("ETAPA 4: EXTRAÇÃO DE DADOS DO PARTICIPANTE")
+	logger.Info("========================================")
+	participantData, err := o.extractParticipantData(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("erro ao extrair dados: %w", err)
+		return nil, fmt.Errorf("erro ao extrair dados do participante: %w", err)
 	}
 	
-	// 4. Navega e extrai dados do imóvel
-	if err := o.extractPropertyData(timeoutCtx, clientData); err != nil {
-		logger.Error(fmt.Sprintf("⚠️ Erro ao extrair dados do imóvel: %v", err))
-		// Não falha o processo
+	// Merge dos dados
+	clientData = participantData
+	
+	// ETAPA 5: EXTRAÇÃO DE DADOS DO IMÓVEL
+	logger.Info("========================================")
+	logger.Info("ETAPA 5: EXTRAÇÃO DE DADOS DO IMÓVEL")
+	logger.Info("========================================")
+	if err := o.extractPropertyData(ctx, clientData); err != nil {
+		logger.Error("⚠️ Erro ao extrair dados do imóvel: " + err.Error())
+		// Não retorna erro, continua
 	}
 	
-	// 5. Navega e extrai dados financeiros
-	if err := o.extractFinancialData(timeoutCtx, clientData); err != nil {
-		logger.Error(fmt.Sprintf("⚠️ Erro ao extrair dados financeiros: %v", err))
-		// Não falha o processo
-	}
-	
-	// Log final
-	o.logFinalResults(clientData)
+	logger.Info("========================================")
+	logger.Info("✅ AUTOMAÇÃO CONCLUÍDA COM SUCESSO!")
+	logger.Info("========================================")
 	
 	return clientData, nil
 }
 
 // executeLogin - executa o processo de login
 func (o *Orchestrator) executeLogin(ctx context.Context, username, password string) error {
-	logger.Info("========================================")
-	logger.Info("ETAPA 1: LOGIN")
-	logger.Info("========================================")
-	
 	if err := o.loginNav.Login(ctx, username, password); err != nil {
 		return err
 	}
@@ -114,16 +111,11 @@ func (o *Orchestrator) executeLogin(ctx context.Context, username, password stri
 		return err
 	}
 	
-	logger.Info("✅ Login realizado com sucesso!")
 	return nil
 }
 
 // executeSearch - executa a busca por CPF
 func (o *Orchestrator) executeSearch(ctx context.Context, cpf string) error {
-	logger.Info("========================================")
-	logger.Info("ETAPA 2: BUSCA POR CPF")
-	logger.Info("========================================")
-	
 	if err := o.searchNav.SearchByCPF(ctx, cpf); err != nil {
 		return err
 	}
@@ -140,18 +132,58 @@ func (o *Orchestrator) executeSearch(ctx context.Context, cpf string) error {
 		logger.Info(fmt.Sprintf("✓ Agendamento: %s", agendamento))
 	}
 	
-	logger.Info("✅ Busca concluída com sucesso!")
+	return nil
+}
+
+// extractFinancialData - navega e extrai dados financeiros (PRIMEIRA ETAPA!)
+func (o *Orchestrator) extractFinancialData(ctx context.Context, clientData *models.ClientData) error {
+	logger.Info("💰 Extraindo valores da operação...")
+	
+	// Navega para Valores da Operação
+	err := o.propertyNav.NavigateToFinancialValues(ctx, o.menuNav, o.iframeWaiter)
+	if err != nil {
+		return fmt.Errorf("erro ao navegar para valores da operação: %w", err)
+	}
+	
+	logger.Info("✅ Navegou para Valores da Operação!")
+	
+	// Aguarda página carregar
+	time.Sleep(3 * time.Second)
+	
+	// Aguarda iframe da página de valores
+	iframeNode, err := o.iframeWaiter.WaitForIframe(ctx, "Valores da Operação")
+	if err != nil {
+		return fmt.Errorf("erro ao aguardar iframe: %w", err)
+	}
+	
+	// Extrai dados financeiros
+	err = o.dataCoordinator.ExtractFinancialData(ctx, iframeNode, clientData)
+	if err != nil {
+		return fmt.Errorf("erro ao extrair valores: %w", err)
+	}
+	
+	logger.Info("✅ Valores da operação extraídos com sucesso!")
 	return nil
 }
 
 // extractParticipantData - extrai todos os dados do participante
 func (o *Orchestrator) extractParticipantData(ctx context.Context) (*models.ClientData, error) {
-	logger.Info("========================================")
-	logger.Info("ETAPA 3: EXTRAÇÃO DE DADOS DO PARTICIPANTE")
-	logger.Info("========================================")
+	// Clica em "Ir Para" para abrir menu
+	if err := o.menuNav.ClickIrPara(ctx, o.iframeWaiter); err != nil {
+		return nil, fmt.Errorf("erro ao abrir menu: %w", err)
+	}
 	
 	// Clica em Participantes
-	if err := o.participantsNav.ClickParticipantes(ctx, o.iframeWaiter); err != nil {
+	if err := o.menuNav.ClickMenuOption(ctx, o.iframeWaiter, "Participantes", "participantePI"); err != nil {
+		return nil, err
+	}
+	
+	// Aguarda página carregar
+	time.Sleep(3 * time.Second)
+	
+	// Busca iframe da página de participantes
+	iframeNode, err := o.iframeWaiter.WaitForIframe(ctx, "Participantes")
+	if err != nil {
 		return nil, err
 	}
 	
@@ -170,7 +202,7 @@ func (o *Orchestrator) extractParticipantData(ctx context.Context) (*models.Clie
 	time.Sleep(3 * time.Second)
 	
 	// Busca iframe dos detalhes
-	iframeNode, err := o.iframeWaiter.WaitForIframe(ctx, "Detalhes Participante")
+	iframeNode, err = o.iframeWaiter.WaitForIframe(ctx, "Detalhes Participante")
 	if err != nil {
 		return nil, err
 	}
@@ -191,10 +223,6 @@ func (o *Orchestrator) extractParticipantData(ctx context.Context) (*models.Clie
 
 // extractPropertyData - navega e extrai dados do imóvel
 func (o *Orchestrator) extractPropertyData(ctx context.Context, clientData *models.ClientData) error {
-	logger.Info("========================================")
-	logger.Info("ETAPA 4: EXTRAÇÃO DE DADOS DO IMÓVEL")
-	logger.Info("========================================")
-	
 	// Navega até página de imóvel
 	if err := o.propertyNav.NavigateToProperty(ctx, o.menuNav, o.iframeWaiter); err != nil {
 		return err
@@ -216,59 +244,4 @@ func (o *Orchestrator) extractPropertyData(ctx context.Context, clientData *mode
 	
 	logger.Info("✅ Dados do imóvel extraídos com sucesso!")
 	return nil
-}
-
-// extractFinancialData - navega e extrai dados financeiros
-func (o *Orchestrator) extractFinancialData(ctx context.Context, clientData *models.ClientData) error {
-	logger.Info("========================================")
-	logger.Info("ETAPA 5: EXTRAÇÃO DE DADOS FINANCEIROS")
-	logger.Info("========================================")
-	
-	// Navega até valores da operação
-	if err := o.propertyNav.NavigateToFinancialValues(ctx, o.menuNav, o.iframeWaiter); err != nil {
-		return err
-	}
-	
-	// Aguarda página carregar
-	time.Sleep(3 * time.Second)
-	
-	// Busca iframe
-	iframeNode, err := o.iframeWaiter.WaitForIframe(ctx, "Valores Operação")
-	if err != nil {
-		return err
-	}
-	
-	// Extrai dados financeiros
-	if err := o.dataCoordinator.ExtractFinancialData(ctx, iframeNode, clientData); err != nil {
-		return err
-	}
-	
-	logger.Info("✅ Dados financeiros extraídos com sucesso!")
-	return nil
-}
-
-// logFinalResults - loga resultados finais
-func (o *Orchestrator) logFinalResults(clientData *models.ClientData) {
-	logger.Info("========================================")
-	logger.Info("✅ PROCESSO CONCLUÍDO COM SUCESSO!")
-	logger.Info("========================================")
-	logger.Info(fmt.Sprintf("📝 Nome: %s", clientData.Nome))
-	logger.Info(fmt.Sprintf("📋 CPF: %s", clientData.CPF))
-	logger.Info(fmt.Sprintf("💼 Ocupação: %s", clientData.Ocupacao))
-	logger.Info(fmt.Sprintf("🌍 Nacionalidade: %s", clientData.Nacionalidade))
-	logger.Info(fmt.Sprintf("🆔 Tipo ID: %s | RG: %s", clientData.TipoIdentificacao, clientData.RG))
-	logger.Info(fmt.Sprintf("👥 Coobrigado: %s (%s)", clientData.CoobrigadoNome, clientData.CoobrigadoCPF))
-	logger.Info(fmt.Sprintf("📱 Telefone: %s", clientData.TelefoneCelular))
-	logger.Info(fmt.Sprintf("🏠 Endereço: %s %s, %s - %s/%s (CEP: %s)", 
-		clientData.TipoLogradouro, 
-		clientData.Logradouro, 
-		clientData.Numero, 
-		clientData.Municipio, 
-		clientData.UF,
-		clientData.CEP))
-	logger.Info(fmt.Sprintf("🏢 Endereço Imóvel: %s (CEP: %s)", clientData.EnderecoImovel, clientData.CEPImovel))
-	logger.Info(fmt.Sprintf("💰 Valor Compra e Venda: %s", clientData.ValorCompraVenda))
-	logger.Info(fmt.Sprintf("📄 Contrato: %s", clientData.NumeroContrato))
-	logger.Info(fmt.Sprintf("💳 Conta: %s (Ag: %s)", clientData.ContaCorrente, clientData.Agencia))
-	logger.Info("========================================")
 }

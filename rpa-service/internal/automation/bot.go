@@ -33,15 +33,20 @@ func NewCaixaBotWithConfig(browserConfig config.BrowserConfig, timeouts config.T
 	}
 }
 
-// LoginAndSearch - executa login e busca (método principal)
+//LoginAndSearch - executa login e busca (método principal)
 func (bot *CaixaBot) LoginAndSearch(username, password, cpf string) (*models.SearchResponse, error) {
+	// Cria contexto base
 	ctx := context.Background()
+	
+	// IMPORTANTE: Cria contexto do Chrome
+	browserCtx, cancel := bot.createBrowserContext(ctx)
+	defer cancel()
 	
 	// Cria orquestrador
 	orchestrator := NewOrchestrator(bot)
 	
-	// Executa fluxo completo
-	clientData, err := orchestrator.Execute(ctx, username, password, cpf)
+	// Executa fluxo completo com o contexto do Chrome
+	clientData, err := orchestrator.Execute(browserCtx, username, password, cpf)
 	
 	if err != nil {
 		return &models.SearchResponse{
@@ -56,7 +61,6 @@ func (bot *CaixaBot) LoginAndSearch(username, password, cpf string) (*models.Sea
 		Data:    clientData,
 	}, nil
 }
-
 // createBrowserContext - cria contexto do navegador
 func (bot *CaixaBot) createBrowserContext(ctx context.Context) (context.Context, context.CancelFunc) {
 	allocCtx, allocCancel := chromedp.NewExecAllocator(ctx, bot.browserConfig.Options...)
